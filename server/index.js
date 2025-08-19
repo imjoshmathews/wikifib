@@ -1,11 +1,8 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const pg_1 = require("pg");
-const pool = new pg_1.Pool({
-    user: 'postgres',
-    database: 'wikifib',
-    port: 5432,
-});
+const secrets_js_1 = require("./secrets.js");
+const pool = new pg_1.Pool(secrets_js_1.POSTGRESQL_CREDENTIALS);
 pool.on('error', (err, client) => {
     console.error('Unexpected error on idle client', err);
     process.exit(-1);
@@ -67,7 +64,7 @@ async function generateNewGame(maxScore, maxArticles, maxRounds) {
 async function deleteQuery(table, id) {
     const query = "DELETE FROM ${} WHERE ";
 }
-// generateNewGame(100, 3, 1000);
+generateNewGame(100, 3, 1000);
 function stringifyWikiQuery(params) {
     let url = wikiApiRoot + "?origin=*";
     Object.keys(params).forEach(function (key) { url += "&" + key + "=" + params[key]; });
@@ -100,12 +97,12 @@ async function addPlayerToDatabase(gameId, socketId, screenname) {
     queryDatabase(query, data);
 }
 async function test() {
-    await addPlayerToDatabase(12, 'popopo', 'Josh');
-    await addPlayerToDatabase(12, 'ertyui', 'Dustin');
-    await addPlayerToDatabase(13, 'wesd', 'Hannah');
-    await addPlayerToDatabase(13, 'ujmki', 'Josh');
+    await addPlayerToDatabase(12, 'yayaya', 'Josh but remote');
+    await addPlayerToDatabase(12, 'yoyoyo', 'Dustin but remote');
+    await addPlayerToDatabase(13, 'yiyiyi', 'Hannah but remote');
+    await addPlayerToDatabase(13, 'yeyeye', 'Josh but remote...er');
 }
-test();
+// test();
 async function hostCheck(gameId) {
     const query = ("SELECT EXISTS (SELECT * FROM players WHERE game_id = " + gameId + " and is_host = true)");
     const res = await queryDatabaseZeroParams(query);

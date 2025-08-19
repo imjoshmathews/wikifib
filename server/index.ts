@@ -1,9 +1,6 @@
 import { Pool } from "pg";
-const pool = new Pool({
-    user: 'postgres',
-    database: 'wikifib',
-    port: 5432,
-});
+import { POSTGRESQL_CREDENTIALS }  from './secrets.js';
+const pool = new Pool(POSTGRESQL_CREDENTIALS);
 pool.on('error', (err, client) =>{
     console.error('Unexpected error on idle client', err);
     process.exit(-1);
@@ -122,7 +119,7 @@ async function deleteQuery(table: string, id: number){
 }
 
 
-// generateNewGame(100, 3, 1000);
+generateNewGame(100, 3, 1000);
 
 function stringifyWikiQuery(params: QueryParams): string {
     let url: string = wikiApiRoot + "?origin=*";
@@ -162,13 +159,13 @@ async function addPlayerToDatabase(gameId: number, socketId: string, screenname:
 }
 
 async function test(){
-    await addPlayerToDatabase(12, 'popopo', 'Josh');
-    await addPlayerToDatabase(12, 'ertyui', 'Dustin');
-    await addPlayerToDatabase(13, 'wesd', 'Hannah');
-    await addPlayerToDatabase(13, 'ujmki', 'Josh');
+    await addPlayerToDatabase(12, 'yayaya', 'Josh but remote');
+    await addPlayerToDatabase(12, 'yoyoyo', 'Dustin but remote');
+    await addPlayerToDatabase(13, 'yiyiyi', 'Hannah but remote');
+    await addPlayerToDatabase(13, 'yeyeye', 'Josh but remote...er');
 }
 
-test();
+// test();
 
 async function hostCheck(gameId: number){
     const query = ("SELECT EXISTS (SELECT * FROM players WHERE game_id = "+gameId+" and is_host = true)");
