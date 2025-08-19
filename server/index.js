@@ -103,11 +103,23 @@ async function getGameIdFromRoomCode(roomCode) {
     const results = await queryDatabase(query, values);
     return results[0].id;
 }
+async function getGameIdFromPlayerId(playerId) {
+    const query = "SELECT game_id FROM players WHERE id = $1";
+    const values = [playerId];
+    const results = await queryDatabase(query, values);
+    return results[0].game_id;
+}
 async function getPlayerIdFromSocketId(socketId) {
     const query = "SELECT id FROM players WHERE socket_id = $1";
     const values = [socketId];
     const results = await queryDatabase(query, values);
     return results[0].id;
+}
+async function getSocketIdFromPlayerId(playerId) {
+    const query = "SELECT socket_id FROM players WHERE id = $1";
+    const values = [playerId];
+    const results = await queryDatabase(query, values);
+    return results[0].socket_id;
 }
 async function getPlayerNameFromPlayerId(playerId) {
     const query = "SELECT screenname FROM players WHERE id = $1";
@@ -121,8 +133,38 @@ async function getPlayerScoreFromPlayerId(playerId) {
     const results = await queryDatabase(query, values);
     return results[0].score;
 }
+async function isPlayerHost(playerId) {
+    const query = "SELECT is_host FROM players WHERE id = $1";
+    const values = [playerId];
+    const results = await queryDatabase(query, values);
+    return results[0].is_host;
+}
+async function isPlayerInterrogator(playerId) {
+    const query = "SELECT is_interrogator FROM players WHERE id = $1";
+    const values = [playerId];
+    const results = await queryDatabase(query, values);
+    return results[0].is_interrogator;
+}
+async function isPlayerHonest(playerId) {
+    const query = "SELECT is_honest FROM players WHERE id = $1";
+    const values = [playerId];
+    const results = await queryDatabase(query, values);
+    return results[0].is_honest;
+}
+async function isPlayerConnected(playerId) {
+    const query = "SELECT is_connected FROM players WHERE id = $1";
+    const values = [playerId];
+    const results = await queryDatabase(query, values);
+    return results[0].is_connected;
+}
+async function getPlayerIdFromArticleId(articleId) {
+    const query = "SELECT player_id FROM articles WHERE id = $1";
+    const values = [articleId];
+    const results = await queryDatabase(query, values);
+    return results[0].player_id;
+}
 async function getArticleIdFromPlayerId(playerId) {
-    const query = "SELECT id FROM players WHERE player_id = $1";
+    const query = "SELECT id FROM article WHERE player_id = $1";
     const values = [playerId];
     const results = await queryDatabase(query, values);
     return results[0].id;
@@ -132,6 +174,12 @@ async function getArticleIdFromWikiId(wikiId) {
     const values = [wikiId];
     const results = await queryDatabase(query, values);
     return results[0].id;
+}
+async function getWikiIdFromArticleId(articleId) {
+    const query = "SELECT wiki_id FROM articles WHERE id = $1";
+    const values = [articleId];
+    const results = await queryDatabase(query, values);
+    return results[0].wiki_id;
 }
 async function getArticleTitleFromArticleId(articleId) {
     const query = "SELECT title FROM articles WHERE id = $1";
@@ -148,9 +196,9 @@ async function addGameToDatabase(gameOptions) {
     const gameId = await getGameIdFromRoomCode(roomCode);
     return gameId;
 }
-async function deleteGameFromDatabase(id) {
+async function deleteGameFromDatabase(gameId) {
     const query = "DELETE FROM games WHERE id = $1";
-    const values = [id];
+    const values = [gameId];
     await queryDatabase(query, values);
 }
 async function addPlayerToDatabase(gameId, player) {
@@ -160,14 +208,29 @@ async function addPlayerToDatabase(gameId, player) {
     const playerId = await getPlayerIdFromSocketId(player.socketId);
     return playerId;
 }
-async function deletePlayerFromDatabase(id) {
+async function deletePlayerFromDatabase(playerId) {
     const query = "DELETE FROM players WHERE id = $1";
-    const values = [id];
+    const values = [playerId];
     await queryDatabase(query, values);
 }
-async function setPlayerAsGameHost(gameId, newHostId) {
-    const query = "UPDATE players SET is_host = true WHERE id = $2 AND game_id = $1";
-    const values = [gameId, newHostId];
+async function setPlayerAsGameHost(gameId, playerId, status) {
+    const query = "UPDATE players SET is_host = $3 WHERE id = $2 AND game_id = $1";
+    const values = [gameId, playerId];
+    await queryDatabase(query, values);
+}
+async function setPlayerAsInterrogator(gameId, playerId, status) {
+    const query = "UPDATE players SET is_interrogator = $3 WHERE id = $2 AND game_id = $1";
+    const values = [gameId, playerId, status];
+    await queryDatabase(query, values);
+}
+async function setPlayerAsHonest(gameId, playerId, status) {
+    const query = "UPDATE players SET is_honest = $3 WHERE id = $2 AND game_id = $1";
+    const values = [gameId, playerId, status];
+    await queryDatabase(query, values);
+}
+async function setPlayerAsConnected(gameId, playerId, status) {
+    const query = "UPDATE players SET is_connected = $3 WHERE id = $2 AND game_id = $1";
+    const values = [gameId, playerId, status];
     await queryDatabase(query, values);
 }
 async function addArticleToDatabase(params, playerId) {
@@ -185,24 +248,8 @@ async function deleteArticleFromDatabase(id) {
 async function createNewGame(gameOptions, firstPlayer) {
     const gameId = await addGameToDatabase(gameOptions);
     const playerId = await addPlayerToDatabase(gameId, firstPlayer);
-    await setPlayerAsGameHost(gameId, playerId);
+    await setPlayerAsGameHost(gameId, playerId, true);
 }
-let testboy = {
-    socketId: 'finality',
-    screenname: 'John Green'
-};
-let newgame = {
-    maxArticles: 6,
-    maxRounds: 6,
-    maxScore: 6,
-};
-createNewGame(newgame, testboy);
-// async function test(){
-//     let output1 : number = await getPlayerIdFromSocketId('wesd');
-//     console.log(output1);
-//     let output2: string = await getPlayerNameFromPlayerId(output1);
-//     console.log(output2);
-// } test();
 async function hostCheck(gameId) {
     const query = ("SELECT EXISTS (SELECT * FROM players WHERE game_id = $1 and is_host = true)");
     const values = [gameId];
