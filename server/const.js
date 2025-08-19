@@ -4,6 +4,7 @@ export const DEFAULT_PARAMS = {
     action: "query",
     format: "json",
     list: "random",
-    rnlimit: 3,
+    rnlimit: 1,
     rnnamespace: 0,
 }
+export const CHARACTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
