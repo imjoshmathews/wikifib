@@ -36,14 +36,100 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const pg_1 = require("pg");
 const secrets_js_1 = require("./secrets.js");
 const CONSTANTS = __importStar(require("./const.js"));
+const http_1 = require("http");
+const socket_io_1 = require("socket.io");
 const pool = new pg_1.Pool(secrets_js_1.POSTGRESQL_CREDENTIALS);
 pool.on('error', (err, client) => {
     console.error('Unexpected error on idle client', err);
     process.exit(-1);
 });
+const httpServer = (0, http_1.createServer)();
+const io = new socket_io_1.Server(httpServer, {
+    cors: {
+        origin: "*",
+    }
+});
 const wikiApiRoot = CONSTANTS.WIKI_API_ROOT;
 const roomCodeLength = CONSTANTS.ROOM_ID_LENGTH;
-const defaultParams = CONSTANTS.DEFAULTPARAMS;
+const defaultParams = CONSTANTS.DEFAULT_PARAMS;
+// outbound events
+// io.on("gameCreated", () => {})
+// io.on("gameStarted", () => {})
+// io.on("sentArticleOptions", (options) => {
+//   console.log(options);
+// });
+// io.on("activeArticleUpdated", () => {})
+// io.on("scoreUpdated", () => {})
+// io.on("roundUpdated", () => {})
+// io.on("interrogatorUpdated", () => {})
+// io.on("playerJoined", () => {})
+// io.on("playerKicked", () => {})
+// io.on("playerPromoted", () => {})
+// io.on("playerGuessed", () => {})
+// io.on("youAreInterrogator", () => {})
+// io.on("youAreNotInterrogator",() => {})
+// io.on("youAreHonest", () => {})
+// io.on("youAreNotHonest",() => {})
+io.on("connection", (socket) => {
+    console.log('Socket has connected');
+    console.log(socket.id);
+    // inbound events
+    socket.on("disconnect", (reason) => {
+        console.log('Socket has disconnected');
+    });
+    socket.on("createGame", async (options, player) => {
+        const roomCode = await createNewGame(options, player, socket);
+        io.to(socket.id).emit("gameCreated", roomCode);
+        console.log("gameCreated: " + roomCode);
+    });
+    socket.on("joinGame", async (roomCode, player) => {
+        const playerId = await addPlayerToGame(roomCode, player);
+        io.to(roomCode).emit("playerJoined", playerId);
+    });
+    socket.on("startGame", (roomCode) => {
+        io.to(roomCode).emit("gameStarted");
+    });
+    socket.on("leaveGame", async () => {
+        const playerId = await getPlayerIdFromSocketId(socket.id);
+        await deletePlayerFromDatabase(playerId);
+        const gameId = await getGameIdFromPlayerId(playerId);
+        const gameEmpty = await isGameEmpty(gameId);
+        if (gameEmpty) {
+            await deleteGameFromDatabase(gameId);
+        }
+        ;
+    });
+    socket.on("endGame", async (roomCode) => {
+        const gameId = await getGameIdFromRoomCode(roomCode);
+        await deleteGameFromDatabase(gameId);
+        io.to(roomCode).emit("gameEnded");
+    });
+    socket.on("guessPlayer", (player) => {
+    });
+    socket.on("promotePlayerToHost", async () => {
+        const playerId = await getPlayerIdFromSocketId(socket.id);
+        const gameId = await getGameIdFromPlayerId(playerId);
+        await setPlayerHost(gameId, playerId, true);
+    });
+    socket.on("selectArticle", async (article) => {
+        const playerId = await getPlayerIdFromSocketId(socket.id);
+        let oldArticleId;
+        oldArticleId = await getArticleIdFromPlayerId(playerId);
+        if (oldArticleId !== undefined) {
+            await deleteArticleFromDatabase(oldArticleId);
+        }
+        ;
+        await addArticleToDatabase(playerId, article);
+    });
+    //io.on("shuffleArticles", () => {})
+    //io.on("kickPlayer", () => {})
+});
+async function initPlayer(roomCode, player) {
+    await addPlayerToGame(roomCode, player);
+    generatePlayerArticles(player);
+}
+;
+httpServer.listen(3666);
 const defaultOptions = {
     maxScore: 10,
     maxArticles: 3,
@@ -62,8 +148,8 @@ function stringifyWikiQuery(params) {
     Object.keys(params).forEach(function (key) { url += "&" + key + "=" + params[key]; });
     return url;
 }
-async function fetchRandomArticle(params) {
-    const response = await fetch(stringifyWikiQuery(params));
+async function fetchRandomArticle() {
+    const response = await fetch(stringifyWikiQuery(defaultParams));
     const wikiQueryResults = await response.json();
     const randomResults = wikiQueryResults.query.random[0];
     return randomResults;
@@ -132,11 +218,23 @@ async function getGameIdFromRoomCode(roomCode) {
     const results = await queryDatabase(query, values);
     return results[0].id;
 }
+async function getRoomCode(gameId) {
+    const query = "SELECT room_code FROM games WHERE id = $1";
+    const values = [gameId];
+    const results = await queryDatabase(query, values);
+    return results[0].room_code;
+}
 async function getGameIdFromPlayerId(playerId) {
     const query = "SELECT game_id FROM players WHERE id = $1";
     const values = [playerId];
     const results = await queryDatabase(query, values);
     return results[0].game_id;
+}
+async function isGameEmpty(gameId) {
+    const query = ("SELECT EXISTS (SELECT * FROM players WHERE game_id = $1)");
+    const values = [gameId];
+    const results = await queryDatabase(query, values);
+    return !(results[0].exists);
 }
 async function getPlayerIdFromSocketId(socketId) {
     const query = "SELECT id FROM players WHERE socket_id = $1";
@@ -173,6 +271,7 @@ async function isPlayerHost(playerId) {
     const results = await queryDatabase(query, values);
     return results[0].is_host;
 }
+async function resetPlayerHost() { }
 async function setPlayerHost(gameId, playerId, status) {
     const query = "UPDATE players SET is_host = $3 WHERE id = $2 AND game_id = $1";
     const values = [gameId, playerId];
@@ -255,23 +354,31 @@ async function deleteGameFromDatabase(gameId) {
     const values = [gameId];
     await queryDatabase(query, values);
 }
-async function addPlayerToDatabase(gameId, player) {
+async function addPlayerToGame(roomCode, player) {
     const query = "INSERT INTO players(game_id, socket_id, screenname) VALUES ($1,$2,$3)";
-    const values = [gameId, player.socketId, player.screenname];
+    const gameId = await getGameIdFromRoomCode(roomCode);
+    const values = [gameId, player.socket.id, player.screenname];
     await queryDatabase(query, values);
-    const playerId = await getPlayerIdFromSocketId(player.socketId);
+    player.socket.join(roomCode);
+    const playerId = await getPlayerIdFromSocketId(player.socket.id);
     return playerId;
 }
+// async function addPlayerToDatabase(gameId: number, player: Player): Promise<number>{
+//     const query: string = "INSERT INTO players(game_id, socket_id, screenname) VALUES ($1,$2,$3)";
+//     const values: Array<any> = [gameId, player.socket.id, player.screenname];
+//     await queryDatabase(query, values);
+//     player.socket.join()
+//     const playerId = await getPlayerIdFromSocketId(player.socket.id);
+//     return playerId;
+// }
 async function deletePlayerFromDatabase(playerId) {
     const query = "DELETE FROM players WHERE id = $1";
     const values = [playerId];
     await queryDatabase(query, values);
 }
-async function addArticleToDatabase(params, playerId) {
-    const wikiQueryResults = await fetchRandomArticle(params);
-    const randomResults = wikiQueryResults.query.random[0];
+async function addArticleToDatabase(playerId, article) {
     const query = "INSERT INTO articles(player_id, wiki_id, title) VALUES ($1,$2,$3)";
-    const values = [playerId, randomResults.id, randomResults.title];
+    const values = [playerId, article.id, article.title];
     queryDatabase(query, values);
     const articleId = await getArticleIdFromPlayerId(playerId);
     return articleId;
@@ -281,10 +388,12 @@ async function deleteArticleFromDatabase(id) {
     const values = [id];
     await queryDatabase(query, values);
 }
-async function createNewGame(gameOptions, firstPlayer) {
+async function createNewGame(gameOptions, firstPlayer, socket) {
     const gameId = await addGameToDatabase(gameOptions);
-    const playerId = await addPlayerToDatabase(gameId, firstPlayer);
+    const roomCode = await getRoomCode(gameId);
+    const playerId = await addPlayerToGame(roomCode, firstPlayer);
     await setPlayerHost(gameId, playerId, true);
+    return roomCode;
 }
 async function hostCheck(gameId) {
     const query = ("SELECT EXISTS (SELECT * FROM players WHERE game_id = $1 and is_host = true)");
@@ -302,6 +411,18 @@ async function winnerScoreCheck(gameId) {
     }
     else
         return false;
+}
+async function generatePlayerArticles(player) {
+    const playerId = await getPlayerIdFromSocketId(player.socket.id);
+    const gameId = await getGameIdFromPlayerId(playerId);
+    const maxArticles = await getGameMaxArticles(gameId);
+    let articleOptions = [];
+    for (let i = 0; i < maxArticles; i++) {
+        const randomResults = await fetchRandomArticle();
+        await articleOptions.push(randomResults);
+    }
+    await io.to(player.socket.id).emit('sentArticleOptions', { options: articleOptions });
+    return articleOptions;
 }
 // async function populateArticleList(params: QueryParams, player: Player){
 //     const wikiQueryResults: WikiQueryResults = await fetchRandomArticles(params);
@@ -323,7 +444,3 @@ async function winnerScoreCheck(gameId) {
 //     await addPlayerToDatabase(13, 'yeyeye', 'Josh but remote...er');
 // }
 // test();
-const io = require('socket.io')(3000);
-io.on('connection', socket => {
-    console.log(socket.id);
-});
