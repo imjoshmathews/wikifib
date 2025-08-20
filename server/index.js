@@ -323,3 +323,7 @@ async function winnerScoreCheck(gameId) {
 //     await addPlayerToDatabase(13, 'yeyeye', 'Josh but remote...er');
 // }
 // test();
+const io = require('socket.io')(3000);
+io.on('connection', socket => {
+    console.log(socket.id);
+});

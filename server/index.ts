@@ -6,7 +6,6 @@ pool.on('error', (err, client) =>{
     console.error('Unexpected error on idle client', err);
     process.exit(-1);
 });
-
 const wikiApiRoot: string = CONSTANTS.WIKI_API_ROOT;
 const roomCodeLength: number = CONSTANTS.ROOM_ID_LENGTH;
 const defaultParams: QueryParams = CONSTANTS.DEFAULTPARAMS;
@@ -331,3 +330,9 @@ async function winnerScoreCheck(gameId: number): Promise<any>{
 //     await addPlayerToDatabase(13, 'yeyeye', 'Josh but remote...er');
 // }
 // test();
+
+const io = require('socket.io')(3000);
+
+io.on('connection', socket => {
+    console.log(socket.id);
+});
