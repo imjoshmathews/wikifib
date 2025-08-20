@@ -97,6 +97,35 @@ async function createUniqueRoomCode() {
     } while (roomCollision);
     return roomCode;
 }
+async function getGameMaxScore(gameId) {
+    const query = "SELECT max_score FROM games WHERE id = $1";
+    const values = [gameId];
+    const results = await queryDatabase(query, values);
+    return results[0].max_score;
+}
+async function getGameMaxArticles(gameId) {
+    const query = "SELECT max_articles FROM games WHERE id = $1";
+    const values = [gameId];
+    const results = await queryDatabase(query, values);
+    return results[0].max_articles;
+}
+async function getGameMaxRounds(gameId) {
+    const query = "SELECT max_rounds FROM games WHERE id = $1";
+    const values = [gameId];
+    const results = await queryDatabase(query, values);
+    return results[0].max_rounds;
+}
+async function getGameCurrentRound(gameId) {
+    const query = "SELECT current_round FROM games WHERE id = $1";
+    const values = [gameId];
+    const results = await queryDatabase(query, values);
+    return results[0].current_round;
+}
+async function setGameCurrentRound(gameId, round) {
+    const query = "UPDATE games SET current_round = $2 WHERE id = $1";
+    const values = [gameId, round];
+    await queryDatabase(query, values);
+}
 async function getGameIdFromRoomCode(roomCode) {
     const query = "SELECT id FROM games WHERE room_code = $1";
     const values = [roomCode];
@@ -115,23 +144,28 @@ async function getPlayerIdFromSocketId(socketId) {
     const results = await queryDatabase(query, values);
     return results[0].id;
 }
-async function getSocketIdFromPlayerId(playerId) {
+async function getPlayerSocketId(playerId) {
     const query = "SELECT socket_id FROM players WHERE id = $1";
     const values = [playerId];
     const results = await queryDatabase(query, values);
     return results[0].socket_id;
 }
-async function getPlayerNameFromPlayerId(playerId) {
+async function getPlayerName(playerId) {
     const query = "SELECT screenname FROM players WHERE id = $1";
     const values = [playerId];
     const results = await queryDatabase(query, values);
     return results[0].screenname;
 }
-async function getPlayerScoreFromPlayerId(playerId) {
+async function getPlayerScore(playerId) {
     const query = "SELECT score FROM players WHERE id = $1";
     const values = [playerId];
     const results = await queryDatabase(query, values);
     return results[0].score;
+}
+async function setPlayerScore(playerId, score) {
+    const query = "UPDATE players SET score = $2 WHERE id = $1";
+    const values = [playerId, score];
+    await queryDatabase(query, values);
 }
 async function isPlayerHost(playerId) {
     const query = "SELECT is_host FROM players WHERE id = $1";
@@ -139,11 +173,21 @@ async function isPlayerHost(playerId) {
     const results = await queryDatabase(query, values);
     return results[0].is_host;
 }
+async function setPlayerHost(gameId, playerId, status) {
+    const query = "UPDATE players SET is_host = $3 WHERE id = $2 AND game_id = $1";
+    const values = [gameId, playerId];
+    await queryDatabase(query, values);
+}
 async function isPlayerInterrogator(playerId) {
     const query = "SELECT is_interrogator FROM players WHERE id = $1";
     const values = [playerId];
     const results = await queryDatabase(query, values);
     return results[0].is_interrogator;
+}
+async function setPlayerInterrogator(gameId, playerId, status) {
+    const query = "UPDATE players SET is_interrogator = $3 WHERE id = $2 AND game_id = $1";
+    const values = [gameId, playerId, status];
+    await queryDatabase(query, values);
 }
 async function isPlayerHonest(playerId) {
     const query = "SELECT is_honest FROM players WHERE id = $1";
@@ -151,11 +195,21 @@ async function isPlayerHonest(playerId) {
     const results = await queryDatabase(query, values);
     return results[0].is_honest;
 }
+async function setPlayerHonest(gameId, playerId, status) {
+    const query = "UPDATE players SET is_honest = $3 WHERE id = $2 AND game_id = $1";
+    const values = [gameId, playerId, status];
+    await queryDatabase(query, values);
+}
 async function isPlayerConnected(playerId) {
     const query = "SELECT is_connected FROM players WHERE id = $1";
     const values = [playerId];
     const results = await queryDatabase(query, values);
     return results[0].is_connected;
+}
+async function setPlayerConnected(gameId, playerId, status) {
+    const query = "UPDATE players SET is_connected = $3 WHERE id = $2 AND game_id = $1";
+    const values = [gameId, playerId, status];
+    await queryDatabase(query, values);
 }
 async function getPlayerIdFromArticleId(articleId) {
     const query = "SELECT player_id FROM articles WHERE id = $1";
@@ -181,7 +235,7 @@ async function getWikiIdFromArticleId(articleId) {
     const results = await queryDatabase(query, values);
     return results[0].wiki_id;
 }
-async function getArticleTitleFromArticleId(articleId) {
+async function getArticleTitle(articleId) {
     const query = "SELECT title FROM articles WHERE id = $1";
     const values = [articleId];
     const results = await queryDatabase(query, values);
@@ -213,32 +267,14 @@ async function deletePlayerFromDatabase(playerId) {
     const values = [playerId];
     await queryDatabase(query, values);
 }
-async function setPlayerAsGameHost(gameId, playerId, status) {
-    const query = "UPDATE players SET is_host = $3 WHERE id = $2 AND game_id = $1";
-    const values = [gameId, playerId];
-    await queryDatabase(query, values);
-}
-async function setPlayerAsInterrogator(gameId, playerId, status) {
-    const query = "UPDATE players SET is_interrogator = $3 WHERE id = $2 AND game_id = $1";
-    const values = [gameId, playerId, status];
-    await queryDatabase(query, values);
-}
-async function setPlayerAsHonest(gameId, playerId, status) {
-    const query = "UPDATE players SET is_honest = $3 WHERE id = $2 AND game_id = $1";
-    const values = [gameId, playerId, status];
-    await queryDatabase(query, values);
-}
-async function setPlayerAsConnected(gameId, playerId, status) {
-    const query = "UPDATE players SET is_connected = $3 WHERE id = $2 AND game_id = $1";
-    const values = [gameId, playerId, status];
-    await queryDatabase(query, values);
-}
 async function addArticleToDatabase(params, playerId) {
     const wikiQueryResults = await fetchRandomArticle(params);
     const randomResults = wikiQueryResults.query.random[0];
     const query = "INSERT INTO articles(player_id, wiki_id, title) VALUES ($1,$2,$3)";
     const values = [playerId, randomResults.id, randomResults.title];
     queryDatabase(query, values);
+    const articleId = await getArticleIdFromPlayerId(playerId);
+    return articleId;
 }
 async function deleteArticleFromDatabase(id) {
     const query = "DELETE FROM articles WHERE id = $1";
@@ -248,13 +284,24 @@ async function deleteArticleFromDatabase(id) {
 async function createNewGame(gameOptions, firstPlayer) {
     const gameId = await addGameToDatabase(gameOptions);
     const playerId = await addPlayerToDatabase(gameId, firstPlayer);
-    await setPlayerAsGameHost(gameId, playerId, true);
+    await setPlayerHost(gameId, playerId, true);
 }
 async function hostCheck(gameId) {
     const query = ("SELECT EXISTS (SELECT * FROM players WHERE game_id = $1 and is_host = true)");
     const values = [gameId];
     const res = await queryDatabase(query, values);
     return (res[0].exists);
+}
+async function winnerScoreCheck(gameId) {
+    const maxScore = await getGameMaxScore(gameId);
+    const query = ("SELECT * FROM players WHERE game_id = $1 AND score >= $2");
+    const values = [gameId, maxScore];
+    const res = await queryDatabase(query, values);
+    if (res.length > 0) {
+        return res;
+    }
+    else
+        return false;
 }
 // async function populateArticleList(params: QueryParams, player: Player){
 //     const wikiQueryResults: WikiQueryResults = await fetchRandomArticles(params);
@@ -267,18 +314,6 @@ async function hostCheck(gameId) {
 //         populateArticleList(params, playerList[p])
 //     }
 // }
-// instantiatePlayer(defaultRoom, "Josh");
-// // instantiatePlayer(defaultRoom, "Hannah");
-// // dealOutArticles(defaultRoom.queryParams, defaultRoom.playerList);
-// // console.log(defaultRoom);
-// // console.log(defaultRoom.playerList);
-//  setTimeout(() => {
-//      console.log(JSON.stringify(defaultRoom, null, "\t"));
-//  //    for(let p in defaultRoom.playerList){
-//  //        console.log(defaultRoom.playerList[p].articleOptions)
-//  //    }
-//  }, 2000);
-// // SELECT ARTICLE
 //addArticleToDatabase(defaultParams, 1);
 //addGameToDatabase(100, 3, 1000);
 // async function test(){
