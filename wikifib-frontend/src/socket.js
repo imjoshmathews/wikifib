@@ -1,6 +1,5 @@
 import { reactive } from "vue";
 import { io } from "socket.io-client";
-import { Socket } from "dgram";
 
 export const state = reactive({
   connected: false,
