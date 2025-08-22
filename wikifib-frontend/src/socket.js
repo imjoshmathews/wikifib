@@ -3,8 +3,10 @@ import { io } from "socket.io-client";
 
 export const state = reactive({
   connected: false,
-  fooEvents: [],
-  barEvents: []
+  gameEvents: [],
+  barEvents: [],
+  roomCode: 'undefined',
+  inLobby: false,
 });
 
 // "undefined" means the URL will be computed from the `window.location` object
@@ -24,8 +26,10 @@ socket.on("disconnect", () => {
 
 
 // inbound events
-socket.on("gameCreated", (roomCode) => {
-  console.log("game created with room code",roomCode);
+socket.on("gameCreated", (rc) => {
+  console.log("game created with room code",rc);
+  state.roomCode = rc;
+  state.inLobby = true;
 })
 socket.on("playerUpdated", (affectsMe, playerData) => {
   console.log("Player updated");

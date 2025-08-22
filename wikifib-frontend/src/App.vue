@@ -1,21 +1,23 @@
 <script setup>
-  import { socket } from './socket';
+  import { socket, state } from './socket';
   import { ref } from 'vue';
+  import RoomCodeDisplay from '@/components/RoomCodeDisplay.vue';
   const name = ref('nerd');
-  const status = ref('silly');
-  const players = ref(['Dakota', 'Dustin', 'Hannah']);
+  // const status = ref('silly');
+  // const players = ref(['Dakota', 'Dustin', 'Hannah']);
   const maxScore = ref(7);
   const maxArticles = ref(2);
   const maxRounds = ref(12);
   const roomCode = ref();
+  const inLobby = () => {return state.inLobby}
 
-  const toggleStatus = () => {
-    if(status.value === 'active'){
-      status.value = 'pending';
-    } else if(status.value === 'pending'){
-      status.value = 'wonky';
-    } else status.value = 'active';
-  }
+  // const toggleStatus = () => {
+  //   if(status.value === 'active'){
+  //     status.value = 'pending';
+  //   } else if(status.value === 'pending'){
+  //     status.value = 'wonky';
+  //   } else status.value = 'active';
+  // }
   const createGame = async () => {
     if(name.value.trim() !== ''){
     const gameOptions = {
@@ -48,7 +50,7 @@
 <label for="screenname">Screenname</label>
 <input type="text" minlength="1" maxlength="30" id="screenname" name="screenname" v-model="name"/><br>
 <br>
-
+<RoomCodeDisplay v-if="inLobby()"/>
   <h2>CREATE A GAME</h2>
   <form @submit.prevent="createGame()">
 
@@ -70,7 +72,4 @@
     <input type="text" minlength="5" maxlength="5" id="roomCode" name="roomCode" v-model="roomCode"/>
     <button type="submit">Join Game</button>
   </form>
-
-
-
 </template>
