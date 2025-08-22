@@ -3,6 +3,7 @@ import * as constants from './const';
 import { createServer } from "http";
 import { DisconnectReason, Server, Socket } from "socket.io";
 import {QueryParams, InitOptions, Article, GameOptions, WikiQueryResults, Player,Game} from './interfaces';
+import { json } from 'stream/consumers';
 
 const httpServer = createServer();
 const io = new Server(httpServer, {
@@ -54,20 +55,36 @@ io.on("connection", (socket: Socket) => {
     let roomCode: string;
 
     socket.on("createGame", async (initOptions: InitOptions) => {
-        player.screenname = initOptions.hostScreenname;
-        const newGameOutput = await createNewGame(initOptions, player);
-        player = newGameOutput[0];
-        roomCode = newGameOutput[1];
-        io.to(socket.id).emit("gameCreated",roomCode);
-        io.to(socket.id).emit("playerUpdated",{affectsMe:true,playerData:player});
-        socket.join(roomCode);
+        const socketIdUnique = await databaseApi.isSocketIdUnique(socket.id);
+        if(socketIdUnique){
+            console.log("Game create emit received");
+            console.log(JSON.stringify(initOptions));
+            player.screenname = initOptions.hostScreenname;
+            const newGameOutput = await createNewGame(initOptions, player);
+            player = newGameOutput[0];
+            roomCode = newGameOutput[1];
+            io.to(socket.id).emit("gameCreated",roomCode);
+            io.to(socket.id).emit("playerUpdated",{affectsMe:true,playerData:player});
+            socket.join(roomCode);
+        } else { io.to(player.socket_id).emit("errorSocketIdNotUnique"); }
     });
-    socket.on("joinGame", async (roomCode: string, screenname: string) => {
-        player.screenname = screenname;
-        player.game_id = await databaseApi.getGameIdFromRoomCode(roomCode);
-        player.id = await databaseApi.addPlayerToGame(roomCode, player);
-        io.to(roomCode).emit("playerJoined",player)
-        socket.join(roomCode);
+    socket.on("joinGame", async (rawRoomCode: string, screenname: string) => {
+        const socketIdUnique = await databaseApi.isSocketIdUnique(socket.id);
+        const roomCode = rawRoomCode.toUpperCase();
+        const roomExists = await databaseApi.doesRoomCodeExist(roomCode);
+        if(!roomExists){
+            io.to(player.socket_id).emit("errorNoRoomFound");
+            return;
+        } if(!socketIdUnique){
+            io.to(player.socket_id).emit("errorSocketIdNotUnique");
+            return;
+        } else{
+            player.screenname = screenname;
+            player.game_id = await databaseApi.getGameIdFromRoomCode(roomCode);
+            player.id = await databaseApi.addPlayerToGame(roomCode, player);
+            socket.join(roomCode);
+            io.to(roomCode).emit("playerJoined",player)
+        }
     });
     socket.on("startGame", (roomCode: string) => {
         if(player.is_host){io.to(roomCode).emit("gameStarted");}
@@ -132,11 +149,11 @@ async function playerExit(player: Player, socket: Socket, roomCode: string){
     };
 }
 
-async function gameStart(gameId: number): Promise<Game>{
-    let game: Game = await databaseApi.getGameObject(gameId);
-    io.to(game.room_code).emit('gameStarted')
-    game.current_round++;
-}
+// async function gameStart(gameId: number): Promise<Game>{
+//     let game: Game = await databaseApi.getGameObject(gameId);
+//     io.to(game.room_code).emit('gameStarted')
+//     game.current_round++;
+// }
 
 async function roundStart() {
 

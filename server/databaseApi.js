@@ -52,6 +52,7 @@ exports.getPlayerName = getPlayerName;
 exports.getPlayerScore = getPlayerScore;
 exports.setPlayerScore = setPlayerScore;
 exports.isPlayerHost = isPlayerHost;
+exports.getHost = getHost;
 exports.resetPlayerHost = resetPlayerHost;
 exports.setPlayerHost = setPlayerHost;
 exports.isPlayerInterrogator = isPlayerInterrogator;
@@ -73,6 +74,12 @@ exports.addArticleToDatabase = addArticleToDatabase;
 exports.deleteArticleFromDatabase = deleteArticleFromDatabase;
 exports.getAllPlayerIds = getAllPlayerIds;
 exports.getAllPlayerObjects = getAllPlayerObjects;
+exports.updateGame = updateGame;
+exports.updatePlayer = updatePlayer;
+exports.updateArticle = updateArticle;
+exports.getGameObject = getGameObject;
+exports.isSocketIdUnique = isSocketIdUnique;
+exports.doesRoomCodeExist = doesRoomCodeExist;
 const pg_1 = require("pg");
 const secrets_1 = require("./secrets");
 const constants = __importStar(require("./const"));
@@ -225,11 +232,17 @@ async function isPlayerHost(playerId) {
     return results[0].is_host;
 }
 ;
+async function getHost(gameId) {
+    const query = "SELECT * FROM players WHERE is_host = true AND game_id = $1";
+    const values = [gameId];
+    const response = await queryDatabase(query, values);
+    return response[0];
+}
 async function resetPlayerHost() { }
 ;
 async function setPlayerHost(gameId, playerId, status) {
     const query = "UPDATE players SET is_host = $3 WHERE id = $2 AND game_id = $1";
-    const values = [gameId, playerId];
+    const values = [gameId, playerId, status];
     await queryDatabase(query, values);
 }
 ;
@@ -362,4 +375,38 @@ async function getAllPlayerObjects(gameId) {
     const values = [gameId];
     const playerList = await queryDatabase(query, values);
     return playerList;
+}
+async function updateGame(game) {
+    const query = "UPDATE games SET (room_code = $1, max_score = $2, max_articles = $3, max_rounds = $4, current_round = $5, game_started: $6) WHERE id = $7";
+    const values = [game.room_code, game.max_score, game.max_articles, game.max_rounds, game.current_round, game.game_started, game.id];
+    await queryDatabase(query, values);
+}
+async function updatePlayer(player) {
+    const query = "UPDATE players SET (game_id = $1, socket_id = $2, screenname = $3, score = $4, is_host = $5, is_interrogator = $6, is_honest = $7, is_connected = $8) where id = $9";
+    const values = [player.game_id, player.socket_id, player.screenname, player.score, player.is_host, player.is_interrogator, player.is_honest, player.is_connected, player.id];
+    await queryDatabase(query, values);
+}
+async function updateArticle(article) {
+    const query = "UPDATE articles SET (player_id = $1, wiki_id = $2, title = $3) WHERE id = $4";
+    const values = [article.player_id, article.wiki_id, article.title, article.id];
+    await queryDatabase(query, values);
+}
+async function getGameObject(gameId) {
+    const query = "SELECT * FROM games WHERE game_id = $1";
+    const values = [gameId];
+    const results = await queryDatabase(query, values);
+    return results[0];
+}
+async function isSocketIdUnique(socketId) {
+    const query = ("SELECT EXISTS (SELECT * FROM players WHERE socket_id = $1)");
+    const values = [socketId];
+    const results = await queryDatabase(query, values);
+    return !(results[0].exists);
+}
+;
+async function doesRoomCodeExist(roomCode) {
+    const query = ("SELECT EXISTS (SELECT * FROM games WHERE room_code = $1)");
+    const values = [roomCode];
+    const results = await queryDatabase(query, values);
+    return results[0].exists;
 }

@@ -1,52 +1,76 @@
-<script>
-    import { state } from "@/socket"
-    export default {
-    data() {
-      return {
-        connname: "ConnectionState",
-        computed: {
-            connected() {
-                return state.connected
-            }
-        },
-        name: 'Josh',
-        status: 'silly',
-        players: ['Dakota', 'Dustin', 'Hannah'],
-        link: 'https://lanefire.net',
-      }
-    },
-    methods: {
-      toggleStatus(){
-        if(this.status === 'active'){
-          this.status = 'pending';
-        } else if(this.status === 'pending'){
-          this.status = 'wonky';
-        } else this.status = 'active';
-      },
-      connect() {
-        socket.connect();
-      },
-      disconnect(){
-        socket.disconnect();
-      }
-    }
+<script setup>
+  import { socket } from './socket';
+  import { ref } from 'vue';
+  const name = ref('nerd');
+  const status = ref('silly');
+  const players = ref(['Dakota', 'Dustin', 'Hannah']);
+  const maxScore = ref(7);
+  const maxArticles = ref(2);
+  const maxRounds = ref(12);
+  const roomCode = ref();
+
+  const toggleStatus = () => {
+    if(status.value === 'active'){
+      status.value = 'pending';
+    } else if(status.value === 'pending'){
+      status.value = 'wonky';
+    } else status.value = 'active';
   }
+  const createGame = async () => {
+    if(name.value.trim() !== ''){
+    const gameOptions = {
+      max_score: maxScore.value,
+      max_articles: maxArticles.value,
+      max_rounds: maxRounds.value,
+    }
+    const initOptions = {hostScreenname:name.value,gameOptions:gameOptions};
+    console.log("create game fired")
+    await socket.emit("createGame", initOptions);
+    } else console.log("name cannot be empty")
+  }
+  const joinGame = async () => {
+    await socket.emit("joinGame", roomCode.value, name.value);
+  }
+
 </script>
 
 <template>
-  <h1>wf</h1>
-  <p v-if="status === 'active'">User is Active</p>
+  <h1>welcome to wikifib, {{ name }}</h1>
+  <!-- <p v-if="status === 'active'">User is Active</p>
   <p v-else-if="status === 'pending'">User is pending</p>
   <p v-else>User is brrrroken</p>
   <h3>Players:</h3>
     <ul>
       <li v-for="player in players" :key="player">{{ player }}</li>
-    </ul>
-  <a :href="link">Click for more info</a>
-  
-  <button @click="toggleStatus">Change status</button>
-  <button @click="connect()">Connect</button>"
-  <button @click="disconnect()">Disconnect</button>
-  <p>State: {{ connected }}</p>
+    </ul>  
+  <br> -->
+<br>
+<label for="screenname">Screenname</label>
+<input type="text" minlength="1" maxlength="30" id="screenname" name="screenname" v-model="name"/><br>
+<br>
+
+  <h2>CREATE A GAME</h2>
+  <form @submit.prevent="createGame()">
+
+    <label for="maxScore">Max Score</label>
+    <input type="number" id="maxScore" name="maxScore" min="5" max="100" v-model="maxScore"><br>
+    
+    <label for="maxRounds">Max Rounds</label>
+    <input type="number" id="maxRounds" name="maxRounds" min="1" max="20" v-model="maxRounds"><br>
+    
+    <label for="maxArticles">Number of Articles to Choose From</label>
+    <input type="number" id="maxArticles" name="maxArticles" min="1" max="5" v-model="maxArticles"><br>
+    
+    <button type="submit">Create Game</button>
+  </form>
+<br><br>
+  <h2>OR JOIN A GAME</h2>
+  <form @submit.prevent="joinGame">
+    <label for="roomCode">Room Code</label>
+    <input type="text" minlength="5" maxlength="5" id="roomCode" name="roomCode" v-model="roomCode"/>
+    <button type="submit">Join Game</button>
+  </form>
+
+
 
 </template>

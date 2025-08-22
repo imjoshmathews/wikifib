@@ -145,7 +145,7 @@ export async function getHost(gameId: number): Promise<Player>{
 export async function resetPlayerHost(){};
 export async function setPlayerHost(gameId: number, playerId: number, status: boolean): Promise<void>{
     const query: string = "UPDATE players SET is_host = $3 WHERE id = $2 AND game_id = $1";
-    const values: Array<any> = [gameId, playerId];
+    const values: Array<any> = [gameId, playerId, status];
     await queryDatabase(query,values);
 };
 export async function isPlayerInterrogator(playerId:number): Promise<boolean>{
@@ -287,4 +287,18 @@ export async function getGameObject(gameId: number): Promise<Game>{
     const values: Array<number> = [gameId];
     const results: Array<Game> = await queryDatabase(query,values);
     return results[0];
+}
+
+export async function isSocketIdUnique(socketId: string): Promise<boolean>{
+    const query: string = ("SELECT EXISTS (SELECT * FROM players WHERE socket_id = $1)");
+    const values: Array<any> = [socketId];
+    const results = await queryDatabase(query,values);
+    return !(results[0].exists);
+};
+
+export async function doesRoomCodeExist(roomCode: string): Promise<boolean>{
+    const query: string = ("SELECT EXISTS (SELECT * FROM games WHERE room_code = $1)");
+    const values: Array<string> = [roomCode];
+    const results = await queryDatabase(query,values);
+    return results[0].exists;
 }

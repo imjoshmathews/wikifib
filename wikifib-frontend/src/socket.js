@@ -24,7 +24,23 @@ socket.on("disconnect", () => {
 
 
 // inbound events
-socket.on("gameCreated", () => {})
+socket.on("gameCreated", (roomCode) => {
+  console.log("game created with room code",roomCode);
+})
+socket.on("playerUpdated", (affectsMe, playerData) => {
+  console.log("Player updated");
+  console.log("was it you?",affectsMe);
+  console.log(playerData);
+})
+
+
+socket.on("errorSocketIdNotUnique", () => {
+  console.log("Player's socket ID is already in a game")
+});
+socket.on("errorNoRoomFound", () => {
+  console.log("No Room Found with that code")
+});
+
 socket.on("gameStarted", () => {})
 socket.on("sentArticleOptions", (options) => {
   console.log(options);
@@ -33,7 +49,7 @@ socket.on("activeArticleUpdated", () => {})
 socket.on("scoreUpdated", () => {})
 socket.on("roundUpdated", () => {})
 socket.on("interrogatorUpdated", () => {})
-socket.on("playerJoined", () => {})
+socket.on("playerJoined", (player) => {console.log(player);})
 socket.on("playerKicked", () => {})
 socket.on("playerPromoted", () => {})
 socket.on("playerGuessed", () => {})
