@@ -26,11 +26,18 @@ socket.on("disconnect", () => {
 
 
 // inbound events
-socket.on("gameCreated", (rc) => {
-  console.log("game created with room code",rc);
-  state.roomCode = rc;
+socket.on("gameCreated", (roomCode) => {
+  console.log("game created with room code",roomCode);
+  state.roomCode = roomCode;
   state.inLobby = true;
 })
+
+socket.on("playerJoined", (player, roomCode) => {
+  console.log(player);
+  state.roomCode = roomCode;
+  state.inLobby = true;
+})
+
 socket.on("playerUpdated", (affectsMe, playerData) => {
   console.log("Player updated");
   console.log("was it you?",affectsMe);
@@ -53,7 +60,7 @@ socket.on("activeArticleUpdated", () => {})
 socket.on("scoreUpdated", () => {})
 socket.on("roundUpdated", () => {})
 socket.on("interrogatorUpdated", () => {})
-socket.on("playerJoined", (player) => {console.log(player);})
+
 socket.on("playerKicked", () => {})
 socket.on("playerPromoted", () => {})
 socket.on("playerGuessed", () => {})

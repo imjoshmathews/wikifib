@@ -63,8 +63,7 @@ async function sanityCheck() {
 }
 io.on("connection", (socket) => {
     //sanityCheck();
-    console.log('Socket has connected');
-    console.log(socket.id);
+    console.log('Socket has connected:', socket.id);
     let player = {
         id: undefined,
         game_id: undefined,
@@ -79,6 +78,7 @@ io.on("connection", (socket) => {
     let roomCode;
     socket.on("createGame", async (initOptions) => {
         const socketIdUnique = await databaseApi.isSocketIdUnique(socket.id);
+        console.log(socketIdUnique);
         if (socketIdUnique) {
             console.log("Game create emit received");
             console.log(JSON.stringify(initOptions));
@@ -102,7 +102,7 @@ io.on("connection", (socket) => {
             io.to(player.socket_id).emit("errorNoRoomFound");
             return;
         }
-        if (!socketIdUnique) {
+        else if (!socketIdUnique) {
             io.to(player.socket_id).emit("errorSocketIdNotUnique");
             return;
         }
@@ -111,7 +111,7 @@ io.on("connection", (socket) => {
             player.game_id = await databaseApi.getGameIdFromRoomCode(roomCode);
             player.id = await databaseApi.addPlayerToGame(roomCode, player);
             socket.join(roomCode);
-            io.to(roomCode).emit("playerJoined", player);
+            io.to(roomCode).emit("playerJoined", player, roomCode);
         }
     });
     socket.on("startGame", (roomCode) => {
@@ -170,6 +170,7 @@ io.on("connection", (socket) => {
         await databaseApi.addArticleToDatabase(playerId, article);
     });
     socket.on("disconnect", (reason) => {
+        console.log("Socket has disconnected:", socket.id, reason);
         if (typeof player.game_id !== undefined) {
             playerExit(player, socket, roomCode);
         }
@@ -182,6 +183,7 @@ async function playerExit(player, socket, roomCode) {
     await databaseApi.deletePlayerFromDatabase(player.id);
     const gameEmpty = await databaseApi.isGameEmpty(player.game_id);
     if (gameEmpty) {
+        console.log("empty game will be deleted.");
         await databaseApi.deleteGameFromDatabase(player.game_id);
     }
     else {

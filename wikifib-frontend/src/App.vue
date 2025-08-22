@@ -47,10 +47,12 @@
     </ul>  
   <br> -->
 <br>
-<label for="screenname">Screenname</label>
+
+<RoomCodeDisplay v-if="inLobby()"/>
+<div v-else>
+  <label for="screenname">Screenname</label>
 <input type="text" minlength="1" maxlength="30" id="screenname" name="screenname" v-model="name"/><br>
 <br>
-<RoomCodeDisplay v-if="inLobby()"/>
   <h2>CREATE A GAME</h2>
   <form @submit.prevent="createGame()">
 
@@ -72,4 +74,5 @@
     <input type="text" minlength="5" maxlength="5" id="roomCode" name="roomCode" v-model="roomCode"/>
     <button type="submit">Join Game</button>
   </form>
+</div>
 </template>
