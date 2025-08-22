@@ -6,7 +6,8 @@ import { ref } from 'vue';
     // defineProps({
     //     roomCode: String,
     // });
-    const rc = () => { return state.roomCode };
+    const roomCode = () => { return state.roomCode };
+    const playerList = () => {return state.playerList};
 </script>
 
 <style>
@@ -18,12 +19,21 @@ import { ref } from 'vue';
         font-size: xx-large;
         font-weight: bold;
     }
+    .players {
+        list-style: none;
+        padding: 1rem;
+        font-size: x-large;
+        color: white;
+    }
 </style>
 
 <template>
     <div class="boxy">
         <p>Your Room Code is</p>
-        <h1 class="rc">{{ rc() }}</h1>
+        <h1 class="rc">{{ roomCode() }}</h1>
         <p>Invite your friends to join you by heading over to wikifib.com and entering this code!</p>
+        <ul class="players">
+            <li v-for="player in playerList()" :key="player">{{player.screenname}}</li>
+        </ul>
     </div>
 </template>

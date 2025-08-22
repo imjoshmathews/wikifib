@@ -3,10 +3,51 @@ import { io } from "socket.io-client";
 
 export const state = reactive({
   connected: false,
-  gameEvents: [],
-  barEvents: [],
+
   roomCode: 'undefined',
+
+  onLandingPage: true,
   inLobby: false,
+  choosingArticle: false,
+  playingGame: false,
+  
+
+  game: {
+    id: undefined,
+    room_code: undefined,
+    max_score: undefined,
+    max_articles: undefined,
+    max_rounds: undefined,
+    current_round: undefined,
+    game_started: false
+  },
+
+  activeArticle: {
+    id: undefined,
+    wiki_id: undefined,
+    title: undefined,
+  },
+
+  playerSelf: {
+    id: undefined,
+    game_id: undefined,
+    socket_id: undefined,
+    screenname: undefined,
+    score: undefined,
+    is_host: undefined,
+    is_interrogator: undefined,
+    is_honest: undefined,
+  },
+
+  playersArticle :{
+    id: undefined,
+    wiki_id: undefined,
+    title: undefined,
+  },
+  playerList: [],
+  articleOptions: [],
+
+
 });
 
 // "undefined" means the URL will be computed from the `window.location` object
@@ -24,25 +65,50 @@ socket.on("disconnect", () => {
   state.connected = false;
 });
 
+function initPlayer(roomCode, player){
+  state.roomCode = roomCode;
+  state.inLobby = true;
+  state.playerSelf = player;
+}
 
 // inbound events
-socket.on("gameCreated", (roomCode) => {
-  console.log("game created with room code",roomCode);
-  state.roomCode = roomCode;
-  state.inLobby = true;
+socket.on("gameCreated", (roomCode, player) => {
+  initPlayer(roomCode, player);
+  socket.emit("requestPlayerList");
+  socket.emit("requestGameInfo");
 })
 
-socket.on("playerJoined", (player, roomCode) => {
-  console.log(player);
-  state.roomCode = roomCode;
-  state.inLobby = true;
+socket.on("deliveringPlayerList", (playerList) => {
+  state.playerList = playerList;
+  console.log(state.playerList);
+})
+
+socket.on("youJoined", (roomCode, player) => {
+  initPlayer(roomCode, player);
+  socket.emit("requestPlayerList");
+})
+
+socket.on("playerJoined", (player) => {
+  state.playerList.push(player);
+  console.log(state.playerList[1]);
 })
 
 socket.on("playerUpdated", (affectsMe, playerData) => {
   console.log("Player updated");
   console.log("was it you?",affectsMe);
   console.log(playerData);
+  if(affectsMe){ state.playerSelf = playerData };
+  const index = state.playerList.findIndex(player => player.id === playerData.id);
+  if(index > -1){state.playerList[index] = playerData}
+  else{state.playerList.push(playerData)};
+  console.log(state.playerList);
+  console.log(state.playerSelf);
 })
+
+// function isTargetPlayer(player) {
+//   return player.id === 
+// }
+
 
 
 socket.on("errorSocketIdNotUnique", () => {

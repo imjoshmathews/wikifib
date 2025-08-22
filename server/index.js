@@ -75,6 +75,12 @@ io.on("connection", (socket) => {
         is_honest: undefined,
         is_connected: true,
     };
+    let article = {
+        id: undefined,
+        player_id: undefined,
+        wiki_id: undefined,
+        title: undefined,
+    };
     let roomCode;
     socket.on("createGame", async (initOptions) => {
         const socketIdUnique = await databaseApi.isSocketIdUnique(socket.id);
@@ -86,16 +92,25 @@ io.on("connection", (socket) => {
             const newGameOutput = await createNewGame(initOptions, player);
             player = newGameOutput[0];
             roomCode = newGameOutput[1];
-            io.to(socket.id).emit("gameCreated", roomCode);
-            io.to(socket.id).emit("playerUpdated", { affectsMe: true, playerData: player });
+            io.to(socket.id).emit("gameCreated", roomCode, player);
+            io.to(socket.id).emit("playerUpdated", true, player);
             socket.join(roomCode);
         }
         else {
             io.to(player.socket_id).emit("errorSocketIdNotUnique");
         }
     });
+    socket.on("requestPlayerList", async () => {
+        const playerList = await databaseApi.getAllPlayerObjects(player.game_id);
+        io.to(roomCode).to(socket.id).emit("deliveringPlayerList", playerList);
+    });
     socket.on("joinGame", async (rawRoomCode, screenname) => {
         const socketIdUnique = await databaseApi.isSocketIdUnique(socket.id);
+        if (rawRoomCode === null) {
+            io.to(player.socket_id).emit("errorNoRoomCodeProvided");
+            return;
+        }
+        ;
         const roomCode = rawRoomCode.toUpperCase();
         const roomExists = await databaseApi.doesRoomCodeExist(roomCode);
         if (!roomExists) {
@@ -111,7 +126,8 @@ io.on("connection", (socket) => {
             player.game_id = await databaseApi.getGameIdFromRoomCode(roomCode);
             player.id = await databaseApi.addPlayerToGame(roomCode, player);
             socket.join(roomCode);
-            io.to(roomCode).emit("playerJoined", player, roomCode);
+            socket.to(roomCode).emit("playerJoined", player);
+            io.to(socket.id).emit("youJoined", roomCode, player);
         }
     });
     socket.on("startGame", (roomCode) => {
@@ -188,6 +204,8 @@ async function playerExit(player, socket, roomCode) {
     }
     else {
         io.to(roomCode).emit("playerLeft", player.screenname);
+        const playerList = await databaseApi.getAllPlayerObjects(player.game_id);
+        io.to(roomCode).to(socket.id).emit("deliveringPlayerList", playerList);
         socket.leave(roomCode);
         if (player.is_host) {
             // assignRandomHost();
@@ -281,11 +299,4 @@ async function createNewGame(initOptions, firstPlayer) {
 //     }
 // }
 //addArticleToDatabase(defaultParams, 1);
-//addGameToDatabase(100, 3, 1000);
-// async function test(){
-//     await addPlayerToDatabase(12, 'yayaya', 'Josh but remote');
-//     await addPlayerToDatabase(12, 'yoyoyo', 'Dustin but remote');
-//     await addPlayerToDatabase(13, 'yiyiyi', 'Hannah but remote');
-//     await addPlayerToDatabase(13, 'yeyeye', 'Josh but remote...er');
-// }
 // test();
