@@ -79,6 +79,7 @@ socket.on("gameCreated", (roomCode, player) => {
 })
 
 socket.on("deliveringPlayerList", (playerList) => {
+  console.log("playerlist delivery!");
   state.playerList = playerList;
   console.log(state.playerList);
 })
@@ -92,6 +93,8 @@ socket.on("playerJoined", (player) => {
   state.playerList.push(player);
   console.log(state.playerList[1]);
 })
+
+socket.on("playerLeft", (name) => {console.log(name);})
 
 socket.on("playerUpdated", (affectsMe, playerData) => {
   console.log("Player updated");

@@ -74,6 +74,7 @@ io.on("connection", (socket: Socket) => {
             io.to(socket.id).emit("gameCreated",roomCode, player);
             io.to(socket.id).emit("playerUpdated",true,player);
             socket.join(roomCode);
+            console.log(socket.rooms);
         } else { io.to(player.socket_id).emit("errorSocketIdNotUnique"); }
     });
     socket.on("requestPlayerList", async() => {
@@ -85,7 +86,7 @@ io.on("connection", (socket: Socket) => {
         if(rawRoomCode === null){io.to(player.socket_id).emit("errorNoRoomCodeProvided");
             return;
         };
-        const roomCode = rawRoomCode.toUpperCase();
+        roomCode = rawRoomCode.toUpperCase();
         const roomExists = await databaseApi.doesRoomCodeExist(roomCode);
         if(!roomExists){
             io.to(player.socket_id).emit("errorNoRoomFound");
@@ -143,6 +144,7 @@ io.on("connection", (socket: Socket) => {
     });
     socket.on("disconnect", (reason: DisconnectReason) => {
         console.log("Socket has disconnected:", socket.id,reason);
+        pushPlayerList(player, roomCode);
         if(typeof player.game_id !== undefined) { playerExit(player, socket, roomCode) };
     });
     
@@ -153,12 +155,12 @@ io.on("connection", (socket: Socket) => {
 async function playerExit(player: Player, socket: Socket, roomCode: string){
     await databaseApi.deletePlayerFromDatabase(player.id);
     const gameEmpty: boolean = await databaseApi.isGameEmpty(player.game_id);
-    if(gameEmpty) { console.log("empty game will be deleted."); 
-    await databaseApi.deleteGameFromDatabase(player.game_id); }
-    else {
+    // if(gameEmpty) { console.log("empty game will be deleted."); 
+    // await databaseApi.deleteGameFromDatabase(player.game_id); }
+    // else {
         io.to(roomCode).emit("playerLeft", player.screenname);
         const playerList = await databaseApi.getAllPlayerObjects(player.game_id);
-        io.to(roomCode).to(socket.id).emit("deliveringPlayerList", playerList);
+        io.to(roomCode).emit("deliveringPlayerList", playerList);
         socket.leave(roomCode);
         if(player.is_host){
             // assignRandomHost();
@@ -166,7 +168,13 @@ async function playerExit(player: Player, socket: Socket, roomCode: string){
         if(player.is_interrogator || player.is_honest){
             // endRoundEarly();
         }
-    };
+    // };
+}
+
+async function pushPlayerList(player, roomCode){
+    const playerList = await databaseApi.getAllPlayerObjects(player.game_id);
+    console.log(playerList);
+    io.to(roomCode).emit("deliveringPlayerList", playerList);
 }
 
 // async function gameStart(gameId: number): Promise<Game>{

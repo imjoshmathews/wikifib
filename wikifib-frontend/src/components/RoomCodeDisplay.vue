@@ -15,7 +15,6 @@ import { ref } from 'vue';
         text-align: center;
     }
     .rc {
-        color: white;
         font-size: xx-large;
         font-weight: bold;
     }
@@ -23,7 +22,7 @@ import { ref } from 'vue';
         list-style: none;
         padding: 1rem;
         font-size: x-large;
-        color: white;
+        /* color: white; */
     }
 </style>
 

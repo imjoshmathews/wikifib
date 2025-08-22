@@ -39,7 +39,7 @@
 
 <style>
   .mainHeader {
-    color: white;
+    /* color: white; */
     text-align: center;
     font-size: 2.5rem;
   }
@@ -62,7 +62,7 @@
     line-height:normal;
   }
   .subHeader {
-    color: white;
+    /* color: white; */
     text-align: center;
   }
   footer {
@@ -73,8 +73,8 @@
     text-align: right;
   }
   input {
-    color: white;
-    background-color: #232323;
+    /* color: white; */
+    /* background-color: #232323; */
     text-align: center;
     border-radius: 0.5rem;
   }
