@@ -1,7 +1,8 @@
 import { Pool } from "pg";
 import { postgresqlCredentials }  from './secrets';
 import * as constants from './const'
-import { Player, Article, GameOptions } from './interfaces';
+import { Player, Article, GameOptions, Game } from './interfaces';
+import { promises } from "dns";
 
 const pool: Pool = new Pool(postgresqlCredentials);
 pool.on('error', (err, client) =>{
@@ -133,6 +134,14 @@ export async function isPlayerHost(playerId:number): Promise<boolean>{
     const results = await queryDatabase(query,values);
     return results[0].is_host;
 };
+
+export async function getHost(gameId: number): Promise<Player>{
+    const query: string = "SELECT * FROM players WHERE is_host = true AND game_id = $1";
+    const values: Array<number> = [gameId];
+    const response = await queryDatabase(query,values);
+    return response[0];
+}
+
 export async function resetPlayerHost(){};
 export async function setPlayerHost(gameId: number, playerId: number, status: boolean): Promise<void>{
     const query: string = "UPDATE players SET is_host = $3 WHERE id = $2 AND game_id = $1";
@@ -163,7 +172,7 @@ export async function setPlayerHonest(gameId: number, playerId: number, status: 
 };
 export async function isPlayerConnected(playerId:number): Promise<boolean>{
     const query: string = "SELECT is_connected FROM players WHERE id = $1";
-    const values: Array<any> = [playerId];
+    const values: Array<number> = [playerId];
     const results = await queryDatabase(query,values);
     return results[0].is_connected;
 };
@@ -174,31 +183,31 @@ export async function setPlayerConnected(gameId: number, playerId: number, statu
 };
 export async function getPlayerIdFromArticleId(articleId: number): Promise<number>{
     const query: string = "SELECT player_id FROM articles WHERE id = $1";
-    const values: Array<any> = [articleId];
+    const values: Array<number> = [articleId];
     const results = await queryDatabase(query,values);
     return results[0].player_id;
 };
 export async function getArticleIdFromPlayerId(playerId: number): Promise<number>{
     const query: string = "SELECT id FROM article WHERE player_id = $1";
-    const values: Array<any> = [playerId];
+    const values: Array<number> = [playerId];
     const results = await queryDatabase(query,values);
     return results[0].id;
 };
 export async function getArticleIdFromWikiId(wikiId: number): Promise<number>{
     const query: string = "SELECT id FROM articles WHERE wiki_id = $1";
-    const values: Array<any> = [wikiId];
+    const values: Array<number> = [wikiId];
     const results = await queryDatabase(query,values);
     return results[0].id;
 };
 export async function getWikiIdFromArticleId(articleId: number): Promise<number>{
     const query: string = "SELECT wiki_id FROM articles WHERE id = $1";
-    const values: Array<any> = [articleId];
+    const values: Array<number> = [articleId];
     const results = await queryDatabase(query,values);
     return results[0].wiki_id;
 };
 export async function getArticleTitle(articleId: number): Promise<string>{
     const query: string = "SELECT title FROM articles WHERE id = $1";
-    const values: Array<any> = [articleId];
+    const values: Array<number> = [articleId];
     const results = await queryDatabase(query,values);
     return results[0].title;
 };
@@ -206,30 +215,26 @@ export async function addGameToDatabase(gameOptions: GameOptions): Promise<numbe
     const query: string = "INSERT INTO games(room_code, max_score, max_articles, max_rounds, current_round, created_at) VALUES ($1,$2,$3,$4,$5,to_timestamp($6))";
     const roomCode: string = await createUniqueRoomCode();
     const timestamp = (Date.now()/1000);
-    const values: Array<any> = [roomCode, gameOptions.maxScore, gameOptions.maxArticles, gameOptions.maxRounds, 0, timestamp];
+    const values: Array<any> = [roomCode, gameOptions.max_score, gameOptions.max_articles, gameOptions.max_rounds, 0, timestamp];
     await queryDatabase(query,values);
     const gameId = await getGameIdFromRoomCode(roomCode);
     return gameId;
 };
 export async function deleteGameFromDatabase(gameId: number){
     const query: string = "DELETE FROM games WHERE id = $1";
-    const values: Array<any> = [gameId];
+    const values: Array<number> = [gameId];
     await queryDatabase(query,values);
 };
-
 export async function addPlayerToGame(roomCode: string, player: Player){
     const query: string = "INSERT INTO players(game_id, socket_id, screenname) VALUES ($1,$2,$3)";
-    const gameId = await getGameIdFromRoomCode(roomCode);
-    const values: Array<any> = [gameId, player.socket.id, player.screenname];
+    const values: Array<any> = [player.game_id, player.socket_id, player.screenname];
     await queryDatabase(query, values);
-    player.socket.join(roomCode);
-    const playerId = await getPlayerIdFromSocketId(player.socket.id);
+    const playerId = await getPlayerIdFromSocketId(player.socket_id);
     return playerId;
 };
-
 export async function deletePlayerFromDatabase(playerId: number): Promise<void>{
     const query: string = "DELETE FROM players WHERE id = $1";
-    const values: Array<any> = [playerId];
+    const values: Array<number> = [playerId];
     await queryDatabase(query,values);
 };
 export async function addArticleToDatabase(playerId: number, article: Article): Promise<number>{
@@ -241,6 +246,45 @@ export async function addArticleToDatabase(playerId: number, article: Article): 
 };
 export async function deleteArticleFromDatabase(id: number): Promise<void>{
     const query: string = "DELETE FROM articles WHERE id = $1";
-    const values: Array<any>= [id];
+    const values: Array<number> = [id];
     await queryDatabase(query,values);
 };
+
+export async function getAllPlayerIds(gameId: number): Promise<Array<number>>{
+    const query: string = "SELECT id FROM players WHERE game_id = $1";
+    const values: Array<number> = [gameId];
+    const playerIdList = await queryDatabase(query,values);
+    return playerIdList;
+}
+
+export async function getAllPlayerObjects(gameId: number): Promise<Array<Player>>{
+    const query: string = "SELECT * FROM players WHERE game_id = $1";
+    const values: Array<number> = [gameId];
+    const playerList = await queryDatabase(query,values);
+    return playerList;
+}
+
+export async function updateGame(game: Game): Promise<void>{
+    const query: string = "UPDATE games SET (room_code = $1, max_score = $2, max_articles = $3, max_rounds = $4, current_round = $5, game_started: $6) WHERE id = $7";
+    const values: Array<any> = [game.room_code,game.max_score,game.max_articles,game.max_rounds,game.current_round,game.game_started,game.id];
+    await queryDatabase(query,values);
+}
+
+export async function updatePlayer(player: Player): Promise<void>{
+    const query: string = "UPDATE players SET (game_id = $1, socket_id = $2, screenname = $3, score = $4, is_host = $5, is_interrogator = $6, is_honest = $7, is_connected = $8) where id = $9";
+    const values: Array<any> = [player.game_id,player.socket_id,player.screenname,player.score,player.is_host,player.is_interrogator,player.is_honest,player.is_connected, player.id];
+    await queryDatabase(query,values);
+}
+
+export async function updateArticle(article: Article): Promise<void>{
+    const query: string = "UPDATE articles SET (player_id = $1, wiki_id = $2, title = $3) WHERE id = $4";
+    const values: Array<any> = [article.player_id,article.wiki_id,article.title,article.id];
+    await queryDatabase(query,values);
+}
+
+export async function getGameObject(gameId: number): Promise<Game>{
+    const query: string = "SELECT * FROM games WHERE game_id = $1";
+    const values: Array<number> = [gameId];
+    const results: Array<Game> = await queryDatabase(query,values);
+    return results[0];
+}

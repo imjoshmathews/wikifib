@@ -12,24 +12,40 @@ export interface WikiQueryResults{
 }
 export interface Article {
     id: number;
+    player_id: number;
+    wiki_id: number;
     title: string;
 }
 export interface Game {
     id: number;
-    roomCode: string;
-    maxScore: number;
-    maxArticles: number;
-    maxRounds: number;
-    currentRound: number;
-    createdAt: EpochTimeStamp;
-}
-export interface GameOptions {
-    maxScore: number;
-    maxArticles: number;
-    maxRounds: number;
-}
-export interface Player {
-    socket: any;
-    screenname: string;
+    room_code: string;
+    max_score: number;
+    max_articles: number;
+    max_rounds: number;
+    current_round: number;
+    created_at: EpochTimeStamp;
+    game_started: boolean;
 }
 
+export interface InitOptions {
+    hostScreenname: string,
+    gameOptions: GameOptions,    
+}
+
+export interface GameOptions {
+    max_score: number;
+    max_articles: number;
+    max_rounds: number;
+}
+
+export interface Player {
+    id: number,
+    game_id: number,
+    socket_id: string,
+    screenname: string,
+    score: number,
+    is_host: boolean,
+    is_interrogator: boolean,
+    is_honest: boolean,
+    is_connected: boolean,
+}

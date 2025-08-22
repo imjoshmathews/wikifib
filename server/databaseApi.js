@@ -71,10 +71,12 @@ exports.addPlayerToGame = addPlayerToGame;
 exports.deletePlayerFromDatabase = deletePlayerFromDatabase;
 exports.addArticleToDatabase = addArticleToDatabase;
 exports.deleteArticleFromDatabase = deleteArticleFromDatabase;
+exports.getAllPlayerIds = getAllPlayerIds;
+exports.getAllPlayerObjects = getAllPlayerObjects;
 const pg_1 = require("pg");
-const secrets_js_1 = require("./secrets.js");
-const constants = __importStar(require("./const.js"));
-const pool = new pg_1.Pool(secrets_js_1.POSTGRESQL_CREDENTIALS);
+const secrets_1 = require("./secrets");
+const constants = __importStar(require("./const"));
+const pool = new pg_1.Pool(secrets_1.postgresqlCredentials);
 pool.on('error', (err, client) => {
     console.error('Unexpected error on idle client', err);
     process.exit(-1);
@@ -309,7 +311,7 @@ async function addGameToDatabase(gameOptions) {
     const query = "INSERT INTO games(room_code, max_score, max_articles, max_rounds, current_round, created_at) VALUES ($1,$2,$3,$4,$5,to_timestamp($6))";
     const roomCode = await createUniqueRoomCode();
     const timestamp = (Date.now() / 1000);
-    const values = [roomCode, gameOptions.maxScore, gameOptions.maxArticles, gameOptions.maxRounds, 0, timestamp];
+    const values = [roomCode, gameOptions.max_score, gameOptions.max_articles, gameOptions.max_rounds, 0, timestamp];
     await queryDatabase(query, values);
     const gameId = await getGameIdFromRoomCode(roomCode);
     return gameId;
@@ -323,22 +325,12 @@ async function deleteGameFromDatabase(gameId) {
 ;
 async function addPlayerToGame(roomCode, player) {
     const query = "INSERT INTO players(game_id, socket_id, screenname) VALUES ($1,$2,$3)";
-    const gameId = await getGameIdFromRoomCode(roomCode);
-    const values = [gameId, player.socket.id, player.screenname];
+    const values = [player.game_id, player.socket_id, player.screenname];
     await queryDatabase(query, values);
-    player.socket.join(roomCode);
-    const playerId = await getPlayerIdFromSocketId(player.socket.id);
+    const playerId = await getPlayerIdFromSocketId(player.socket_id);
     return playerId;
 }
 ;
-// async function addPlayerToDatabase(gameId: number, player: Player): Promise<number>{
-//     const query: string = "INSERT INTO players(game_id, socket_id, screenname) VALUES ($1,$2,$3)";
-//     const values: Array<any> = [gameId, player.socket.id, player.screenname];
-//     await queryDatabase(query, values);
-//     player.socket.join()
-//     const playerId = await getPlayerIdFromSocketId(player.socket.id);
-//     return playerId;
-// }
 async function deletePlayerFromDatabase(playerId) {
     const query = "DELETE FROM players WHERE id = $1";
     const values = [playerId];
@@ -359,3 +351,15 @@ async function deleteArticleFromDatabase(id) {
     await queryDatabase(query, values);
 }
 ;
+async function getAllPlayerIds(gameId) {
+    const query = "SELECT id FROM players WHERE game_id = $1";
+    const values = [gameId];
+    const playerIdList = await queryDatabase(query, values);
+    return playerIdList;
+}
+async function getAllPlayerObjects(gameId) {
+    const query = "SELECT * FROM players WHERE game_id = $1";
+    const values = [gameId];
+    const playerList = await queryDatabase(query, values);
+    return playerList;
+}

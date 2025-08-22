@@ -33,17 +33,10 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-// import { Pool } from "pg";
-// import { POSTGRESQL_CREDENTIALS }  from './secrets.js';
 const databaseApi = __importStar(require("./databaseApi"));
 const constants = __importStar(require("./const"));
 const http_1 = require("http");
 const socket_io_1 = require("socket.io");
-// const pool = new Pool(POSTGRESQL_CREDENTIALS);
-// pool.on('error', (err, client) =>{
-//     console.error('Unexpected error on idle client', err);
-//     process.exit(-1);
-// });
 const httpServer = (0, http_1.createServer)();
 const io = new socket_io_1.Server(httpServer, {
     cors: {
@@ -54,44 +47,50 @@ const wikiApiRoot = constants.wikiApiRoot;
 const roomCodeLength = constants.roomIdLength;
 const defaultParams = constants.defaultParams;
 // outbound events
-// io.on("gameCreated", () => {})
-// io.on("gameStarted", () => {})
-// io.on("sentArticleOptions", (options) => {
-//   console.log(options);
-// });
-// io.on("activeArticleUpdated", () => {})
-// io.on("scoreUpdated", () => {})
-// io.on("roundUpdated", () => {})
-// io.on("interrogatorUpdated", () => {})
-// io.on("playerJoined", () => {})
+// io.on("updateArticleOptions", () => {})
+// io.on("updateActiveArticle", () => {})
+// io.on("updateScore", () => {})
+// io.on("updateRound", () => {})
+// io.on("updateHost", () => {})
+// io.on("updateInterrogator", () => {})
+// io.on("updateHonestPlayer", () => {})
 // io.on("playerKicked", () => {})
-// io.on("playerPromoted", () => {})
 // io.on("playerGuessed", () => {})
-// io.on("youAreInterrogator", () => {})
-// io.on("youAreNotInterrogator",() => {})
-// io.on("youAreHonest", () => {})
-// io.on("youAreNotHonest",() => {})
 async function queryTest() {
-    console.log("QueryTest Started");
-    const output = await databaseApi.getGameMaxScore(19);
+    const output = await databaseApi.getAllPlayerObjects(19);
+    const readable = JSON.stringify(output);
     console.log("The max score of game 19 is", output);
 }
 io.on("connection", (socket) => {
     queryTest();
     console.log('Socket has connected');
     console.log(socket.id);
-    // inbound events
-    socket.on("disconnect", (reason) => {
-        console.log('Socket has disconnected');
-    });
-    socket.on("createGame", async (options, player) => {
-        const roomCode = await createNewGame(options, player, socket);
+    let player = {
+        id: undefined,
+        game_id: undefined,
+        socket_id: socket.id,
+        screenname: undefined,
+        score: undefined,
+        is_host: undefined,
+        is_interrogator: undefined,
+        is_honest: undefined,
+        is_connected: true,
+    };
+    socket.on("createGame", async (initOptions) => {
+        player.screenname = initOptions.hostScreenname;
+        const newGameOutput = await createNewGame(initOptions, player);
+        player = newGameOutput[0];
+        const roomCode = newGameOutput[1];
         io.to(socket.id).emit("gameCreated", roomCode);
-        console.log("gameCreated: " + roomCode);
+        io.to(socket.id).emit("playerUpdated", { affectsMe: true, playerData: player });
+        socket.join(roomCode);
     });
-    socket.on("joinGame", async (roomCode, player) => {
-        const playerId = await databaseApi.addPlayerToGame(roomCode, player);
-        io.to(roomCode).emit("playerJoined", playerId);
+    socket.on("joinGame", async (roomCode, screenname) => {
+        player.screenname = screenname;
+        player.game_id = await databaseApi.getGameIdFromRoomCode(roomCode);
+        player.id = await databaseApi.addPlayerToGame(roomCode, player);
+        io.to(roomCode).emit("playerJoined", player);
+        socket.join(roomCode);
     });
     socket.on("startGame", (roomCode) => {
         io.to(roomCode).emit("gameStarted");
@@ -128,9 +127,54 @@ io.on("connection", (socket) => {
         ;
         await databaseApi.addArticleToDatabase(playerId, article);
     });
+    socket.on("disconnect", (reason) => {
+        console.log('Socket has disconnected:', reason);
+        playerExit(player);
+    });
     //io.on("shuffleArticles", () => {})
     //io.on("kickPlayer", () => {})
 });
+async function playerExit(player) {
+    await databaseApi.deletePlayerFromDatabase(player.id);
+    const gameEmpty = await databaseApi.isGameEmpty(player.game_id);
+    if (gameEmpty) {
+        await databaseApi.deleteGameFromDatabase(player.game_id);
+    }
+    else {
+        const roomCode = await databaseApi.getRoomCode(player.game_id);
+        io.to(roomCode).emit("playerLeft", player.screenname);
+        if (player.is_host) { }
+        if (player.is_interrogator) { }
+        if (player.is_honest) { }
+    }
+    ;
+}
+async function roundStart(gameId) {
+    const playerList = await databaseApi.getAllPlayerIds(gameId);
+    for (const player of playerList) {
+        const socketId = databaseApi.getPlayerSocketId(player);
+    }
+}
+async function assignHonestPlayer(gameId) {
+    const playerList = await databaseApi.getAllPlayerObjects(gameId);
+    let candidates = [];
+    for (const player of playerList) {
+        if (!player.is_honest) {
+            candidates.push(player);
+        }
+        else {
+            databaseApi.setPlayerInterrogator(player.game_id, player.id, true);
+            databaseApi.setPlayerHonest(player.game_id, player.id, false);
+        }
+    }
+    const honestPlayer = candidates[Math.floor(Math.random() * candidates.length)];
+    for (const player of candidates) {
+        databaseApi.setPlayerInterrogator(player.game_id, player.id, false);
+        if (player === honestPlayer) {
+            databaseApi.setPlayerHonest(player.game_id, player.id, true);
+        }
+    }
+}
 async function initPlayer(roomCode, player) {
     await databaseApi.addPlayerToGame(roomCode, player);
     generatePlayerArticles(player);
@@ -138,9 +182,9 @@ async function initPlayer(roomCode, player) {
 ;
 httpServer.listen(3666);
 const defaultOptions = {
-    maxScore: 10,
-    maxArticles: 3,
-    maxRounds: 5,
+    max_score: 10,
+    max_articles: 3,
+    max_rounds: 5,
 };
 function stringifyWikiQuery(params) {
     let url = wikiApiRoot + "?origin=*";
@@ -154,7 +198,7 @@ async function fetchRandomArticle() {
     return randomResults;
 }
 async function generatePlayerArticles(player) {
-    const playerId = await databaseApi.getPlayerIdFromSocketId(player.socket.id);
+    const playerId = await databaseApi.getPlayerIdFromSocketId(player.socket_id);
     const gameId = await databaseApi.getGameIdFromPlayerId(playerId);
     const maxArticles = await databaseApi.getGameMaxArticles(gameId);
     let articleOptions = [];
@@ -162,15 +206,18 @@ async function generatePlayerArticles(player) {
         const randomResults = await fetchRandomArticle();
         await articleOptions.push(randomResults);
     }
-    await io.to(player.socket.id).emit('sentArticleOptions', { options: articleOptions });
+    await io.to(player.socket_id).emit('sentArticleOptions', { options: articleOptions });
     return articleOptions;
 }
-async function createNewGame(gameOptions, firstPlayer, socket) {
-    const gameId = await databaseApi.addGameToDatabase(gameOptions);
+async function createNewGame(initOptions, firstPlayer) {
+    const gameId = await databaseApi.addGameToDatabase(initOptions.gameOptions);
+    firstPlayer.game_id = gameId;
     const roomCode = await databaseApi.getRoomCode(gameId);
     const playerId = await databaseApi.addPlayerToGame(roomCode, firstPlayer);
+    firstPlayer.id = playerId;
+    firstPlayer.is_host = true;
     await databaseApi.setPlayerHost(gameId, playerId, true);
-    return roomCode;
+    return [firstPlayer, roomCode];
 }
 // async function populateArticleList(params: QueryParams, player: Player){
 //     const wikiQueryResults: WikiQueryResults = await fetchRandomArticles(params);
