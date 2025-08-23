@@ -350,11 +350,11 @@ async function deletePlayerFromDatabase(playerId) {
     await queryDatabase(query, values);
 }
 ;
-async function addArticleToDatabase(playerId, article) {
+async function addArticleToDatabase(article) {
     const query = "INSERT INTO articles(player_id, wiki_id, title) VALUES ($1,$2,$3)";
-    const values = [playerId, article.id, article.title];
+    const values = [article.player_id, article.id, article.title];
     queryDatabase(query, values);
-    const articleId = await getArticleIdFromPlayerId(playerId);
+    const articleId = await getArticleIdFromPlayerId(article.player_id);
     return articleId;
 }
 ;

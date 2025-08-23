@@ -237,11 +237,11 @@ export async function deletePlayerFromDatabase(playerId: number): Promise<void>{
     const values: Array<number> = [playerId];
     await queryDatabase(query,values);
 };
-export async function addArticleToDatabase(playerId: number, article: Article): Promise<number>{
+export async function addArticleToDatabase(article: Article): Promise<number>{
     const query: string = "INSERT INTO articles(player_id, wiki_id, title) VALUES ($1,$2,$3)";
-    const values: Array<any> = [playerId,article.id,article.title];
+    const values: Array<any> = [article.player_id,article.id,article.title];
     queryDatabase(query, values);
-    const articleId = await getArticleIdFromPlayerId(playerId);
+    const articleId = await getArticleIdFromPlayerId(article.player_id);
     return articleId;
 };
 export async function deleteArticleFromDatabase(id: number): Promise<void>{

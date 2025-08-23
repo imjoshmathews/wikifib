@@ -58,10 +58,11 @@ const defaultParams = constants.defaultParams;
 // io.on("playerKicked", () => {})
 // io.on("playerGuessed", () => {})
 async function sanityCheck() {
-    const output = await databaseApi.getAllPlayerObjects(19);
-    const readable = JSON.stringify(output);
-    console.log("The max score of game 19 is", output);
+    let article = await fetchRandomArticle();
+    const readable = JSON.stringify(article);
+    console.log(article);
 }
+sanityCheck();
 io.on("connection", (socket) => {
     //sanityCheck();
     console.log('Socket has connected:', socket.id);
@@ -105,6 +106,23 @@ io.on("connection", (socket) => {
     socket.on("requestPlayerList", async () => {
         const playerList = await databaseApi.getAllPlayerObjects(player.game_id);
         io.to(roomCode).to(socket.id).emit("deliveringPlayerList", playerList);
+    });
+    socket.on("requestArticleOptions", async () => {
+        console.log("I gotta request for articles!");
+        const numberOfOptions = await databaseApi.getGameMaxArticles(player.game_id);
+        let articleOptions = [];
+        for (let i = 0; i < numberOfOptions; i++) {
+            const randomResults = await fetchRandomArticle();
+            const article = {
+                id: undefined,
+                player_id: player.id,
+                wiki_id: randomResults.id,
+                title: randomResults.title,
+            };
+            articleOptions.push(article);
+        }
+        console.log(articleOptions);
+        io.to(socket.id).emit("deliveringArticleOptions", articleOptions);
     });
     socket.on("joinGame", async (rawRoomCode, screenname) => {
         const socketIdUnique = await databaseApi.isSocketIdUnique(socket.id);
@@ -185,7 +203,7 @@ io.on("connection", (socket) => {
             await databaseApi.deleteArticleFromDatabase(oldArticleId);
         }
         ;
-        await databaseApi.addArticleToDatabase(playerId, article);
+        await databaseApi.addArticleToDatabase(article);
     });
     socket.on("disconnect", (reason) => {
         console.log("Socket has disconnected:", socket.id, reason);

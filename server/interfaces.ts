@@ -10,6 +10,13 @@ export interface WikiQueryResults{
     continue: object;
     query;
 }
+
+export interface RandomResults{
+    id: number,
+    ns: number,
+    title: string,
+}
+
 export interface Article {
     id: number;
     player_id: number;

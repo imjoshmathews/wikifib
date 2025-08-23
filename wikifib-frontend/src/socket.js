@@ -84,6 +84,12 @@ socket.on("deliveringPlayerList", (playerList) => {
   console.log(state.playerList);
 })
 
+socket.on("deliveringArticleOptions", (articleOptions) => {
+  console.log("article option delivery!");
+  state.articleOptions = articleOptions;
+  console.log(state.articleOptions);
+})
+
 socket.on("youJoined", (roomCode, player) => {
   initPlayer(roomCode, player);
   socket.emit("requestPlayerList");

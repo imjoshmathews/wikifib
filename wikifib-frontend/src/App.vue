@@ -102,7 +102,7 @@
 <br>
 <div class="createGameBox">
   <h2 class="subHeader">CREATE A GAME</h2><br>
-  <form @submit.prevent="createGame()">
+  <form @submit.prevent="createGame">
 
     <label for="maxScore">Max Score </label>
     <input type="number" id="maxScore" name="maxScore" min="5" max="100" v-model="maxScore"><br>

@@ -2,7 +2,7 @@ import * as databaseApi from './databaseApi';
 import * as constants from './const';
 import { createServer } from "http";
 import { DisconnectReason, Server, Socket } from "socket.io";
-import {QueryParams, InitOptions, Article, GameOptions, WikiQueryResults, Player,Game} from './interfaces';
+import {QueryParams, InitOptions, Article, GameOptions, WikiQueryResults, Player, Game, RandomResults} from './interfaces';
 import { json } from 'stream/consumers';
 
 const httpServer = createServer();
@@ -31,10 +31,11 @@ const defaultParams: QueryParams = constants.defaultParams;
 
 
 async function sanityCheck(){
-    const output = await databaseApi.getAllPlayerObjects(19);
-    const readable = JSON.stringify(output);
-    console.log("The max score of game 19 is", output);
+    let article = await fetchRandomArticle();
+    const readable = JSON.stringify(article);
+    console.log(article);
 }
+sanityCheck();
 
 io.on("connection", (socket: Socket) => {
     //sanityCheck();
@@ -80,6 +81,23 @@ io.on("connection", (socket: Socket) => {
     socket.on("requestPlayerList", async() => {
         const playerList = await databaseApi.getAllPlayerObjects(player.game_id);
         io.to(roomCode).to(socket.id).emit("deliveringPlayerList", playerList);
+    })
+    socket.on("requestArticleOptions", async() => {
+        console.log("I gotta request for articles!")
+        const numberOfOptions: number = await databaseApi.getGameMaxArticles(player.game_id);
+        let articleOptions: Array<Article> = [];
+        for(let i=0; i<numberOfOptions; i++){
+            const randomResults: RandomResults = await fetchRandomArticle();
+            const article: Article = {
+                id: undefined,
+                player_id: player.id,
+                wiki_id: randomResults.id,
+                title: randomResults.title,
+            }
+            articleOptions.push(article);
+        }
+        console.log(articleOptions);
+        io.to(socket.id).emit("deliveringArticleOptions", articleOptions);
     })
     socket.on("joinGame", async (rawRoomCode: string, screenname: string) => {
         const socketIdUnique = await databaseApi.isSocketIdUnique(socket.id);
@@ -140,7 +158,7 @@ io.on("connection", (socket: Socket) => {
         let oldArticleId : number | undefined;
         oldArticleId = await databaseApi.getArticleIdFromPlayerId(playerId)
         if(oldArticleId !== undefined){ await databaseApi.deleteArticleFromDatabase(oldArticleId); };
-        await databaseApi.addArticleToDatabase(playerId, article);
+        await databaseApi.addArticleToDatabase(article);
     });
     socket.on("disconnect", (reason: DisconnectReason) => {
         console.log("Socket has disconnected:", socket.id,reason);
@@ -223,7 +241,7 @@ function stringifyWikiQuery(params: QueryParams): string {
     Object.keys(params).forEach(function(key){url += "&" + key + "=" + params[key];})
     return url;
 }
-async function fetchRandomArticle(): Promise<WikiQueryResults> {
+async function fetchRandomArticle(): Promise<RandomResults> {
     const response: Response = await fetch(stringifyWikiQuery(defaultParams));
     const wikiQueryResults: WikiQueryResults = await response.json();
     const randomResults = wikiQueryResults.query.random[0];
@@ -236,7 +254,7 @@ async function generatePlayerArticles(player: Player): Promise<Array<any>>{
     const maxArticles: number = await databaseApi.getGameMaxArticles(gameId);
     let articleOptions: Array<any> = [];
     for(let i=0; i < maxArticles; i++){
-        const randomResults: WikiQueryResults = await fetchRandomArticle();
+        const randomResults: RandomResults = await fetchRandomArticle();
         await articleOptions.push(randomResults);
     } 
     await io.to(player.socket_id).emit('sentArticleOptions',{options:articleOptions});
