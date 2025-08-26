@@ -8,6 +8,7 @@ import { json } from 'stream/consumers';
 const httpServer = createServer();
 const io = new Server(httpServer, {
     pingTimeout: 30000,
+    connectionStateRecovery: {},
     cors: {
         origin: "*",
     }
@@ -31,9 +32,7 @@ const defaultParams: QueryParams = constants.defaultParams;
 
 
 async function sanityCheck(){
-    let article = await fetchRandomArticle();
-    const readable = JSON.stringify(article);
-    console.log(article);
+    console.log("Sanity Check");
 }
 sanityCheck();
 
@@ -83,7 +82,6 @@ io.on("connection", (socket: Socket) => {
         io.to(roomCode).to(socket.id).emit("deliveringPlayerList", playerList);
     })
     socket.on("requestArticleOptions", async() => {
-        console.log("I gotta request for articles!")
         const numberOfOptions: number = await databaseApi.getGameMaxArticles(player.game_id);
         let articleOptions: Array<Article> = [];
         for(let i=0; i<numberOfOptions; i++){
@@ -121,9 +119,8 @@ io.on("connection", (socket: Socket) => {
             io.to(socket.id).emit("youJoined", roomCode, player)
         }
     });
-    socket.on("startGame", (roomCode: string) => {
-        if(player.is_host){io.to(roomCode).emit("gameStarted");}
-        else{ io.to(player.socket_id).emit("errorNotHost");}
+    socket.on("startGame", () => {
+        io.to(roomCode).emit("gameStarted");
     });
     socket.on("leaveGame", () => {
         playerExit(player, socket, roomCode);
@@ -153,12 +150,13 @@ io.on("connection", (socket: Socket) => {
             databaseApi.setPlayerHost(player.game_id, player.id, true);
         } else {io.to(player.socket_id).emit("errorNotHost")}
     });
-    socket.on("selectArticle", async (article: Article) => {
-        const playerId = await databaseApi.getPlayerIdFromSocketId(socket.id);
-        let oldArticleId : number | undefined;
-        oldArticleId = await databaseApi.getArticleIdFromPlayerId(playerId)
-        if(oldArticleId !== undefined){ await databaseApi.deleteArticleFromDatabase(oldArticleId); };
-        await databaseApi.addArticleToDatabase(article);
+    socket.on("selectedArticle", async (selectedArticle: Article) => {
+        const playerHasArticle = await databaseApi.doesArticleForPlayerExist(selectedArticle.player_id);
+        if(playerHasArticle){ await databaseApi.deleteArticleFromDatabase(article.id); };
+        article = selectedArticle;
+        article.id = await databaseApi.addArticleToDatabase(article);
+        console.log(player.screenname,"selected article",article);
+        io.to(socket.id).emit("articleRegistered", article);
     });
     socket.on("disconnect", (reason: DisconnectReason) => {
         console.log("Socket has disconnected:", socket.id,reason);

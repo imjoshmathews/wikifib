@@ -80,6 +80,7 @@ exports.updateArticle = updateArticle;
 exports.getGameObject = getGameObject;
 exports.isSocketIdUnique = isSocketIdUnique;
 exports.doesRoomCodeExist = doesRoomCodeExist;
+exports.doesArticleForPlayerExist = doesArticleForPlayerExist;
 const pg_1 = require("pg");
 const secrets_1 = require("./secrets");
 const constants = __importStar(require("./const"));
@@ -293,7 +294,7 @@ async function getPlayerIdFromArticleId(articleId) {
 }
 ;
 async function getArticleIdFromPlayerId(playerId) {
-    const query = "SELECT id FROM article WHERE player_id = $1";
+    const query = "SELECT id FROM articles WHERE player_id = $1";
     const values = [playerId];
     const results = await queryDatabase(query, values);
     return results[0].id;
@@ -352,8 +353,8 @@ async function deletePlayerFromDatabase(playerId) {
 ;
 async function addArticleToDatabase(article) {
     const query = "INSERT INTO articles(player_id, wiki_id, title) VALUES ($1,$2,$3)";
-    const values = [article.player_id, article.id, article.title];
-    queryDatabase(query, values);
+    const values = [article.player_id, article.wiki_id, article.title];
+    await queryDatabase(query, values);
     const articleId = await getArticleIdFromPlayerId(article.player_id);
     return articleId;
 }
@@ -407,6 +408,12 @@ async function isSocketIdUnique(socketId) {
 async function doesRoomCodeExist(roomCode) {
     const query = ("SELECT EXISTS (SELECT * FROM games WHERE room_code = $1)");
     const values = [roomCode];
+    const results = await queryDatabase(query, values);
+    return results[0].exists;
+}
+async function doesArticleForPlayerExist(playerId) {
+    const query = ("SELECT EXISTS (SELECT * FROM articles WHERE player_id = $1)");
+    const values = [playerId];
     const results = await queryDatabase(query, values);
     return results[0].exists;
 }

@@ -4,6 +4,7 @@ export interface QueryParams {
     list: string;
     rnlimit: number;
     rnnamespace: number;
+    rnminsize: number;
 }
 export interface WikiQueryResults{
     batchcomplete: string;

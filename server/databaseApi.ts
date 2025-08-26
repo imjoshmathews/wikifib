@@ -2,7 +2,6 @@ import { Pool } from "pg";
 import { postgresqlCredentials }  from './secrets';
 import * as constants from './const'
 import { Player, Article, GameOptions, Game } from './interfaces';
-import { promises } from "dns";
 
 const pool: Pool = new Pool(postgresqlCredentials);
 pool.on('error', (err, client) =>{
@@ -188,7 +187,7 @@ export async function getPlayerIdFromArticleId(articleId: number): Promise<numbe
     return results[0].player_id;
 };
 export async function getArticleIdFromPlayerId(playerId: number): Promise<number>{
-    const query: string = "SELECT id FROM article WHERE player_id = $1";
+    const query: string = "SELECT id FROM articles WHERE player_id = $1";
     const values: Array<number> = [playerId];
     const results = await queryDatabase(query,values);
     return results[0].id;
@@ -239,8 +238,8 @@ export async function deletePlayerFromDatabase(playerId: number): Promise<void>{
 };
 export async function addArticleToDatabase(article: Article): Promise<number>{
     const query: string = "INSERT INTO articles(player_id, wiki_id, title) VALUES ($1,$2,$3)";
-    const values: Array<any> = [article.player_id,article.id,article.title];
-    queryDatabase(query, values);
+    const values: Array<any> = [article.player_id,article.wiki_id,article.title];
+    await queryDatabase(query, values);
     const articleId = await getArticleIdFromPlayerId(article.player_id);
     return articleId;
 };
@@ -299,6 +298,13 @@ export async function isSocketIdUnique(socketId: string): Promise<boolean>{
 export async function doesRoomCodeExist(roomCode: string): Promise<boolean>{
     const query: string = ("SELECT EXISTS (SELECT * FROM games WHERE room_code = $1)");
     const values: Array<string> = [roomCode];
+    const results = await queryDatabase(query,values);
+    return results[0].exists;
+}
+
+export async function doesArticleForPlayerExist(playerId: number): Promise<boolean>{
+    const query: string = ("SELECT EXISTS (SELECT * FROM articles WHERE player_id = $1)");
+    const values: Array<number> = [playerId];
     const results = await queryDatabase(query,values);
     return results[0].exists;
 }

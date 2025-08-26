@@ -1,17 +1,18 @@
 import { reactive } from "vue";
 import { io } from "socket.io-client";
 
+export const PageModes = {
+  OnLandingPage: Symbol("OnLandingPage"),
+  InLobby: Symbol("InLobby"),
+  ChoosingArticle: Symbol("ChoosingArticle"),
+  ReadingArticle: Symbol("ReadingArticle"),
+  PlayingGame: Symbol("PlayingGame"),
+}
+
 export const state = reactive({
   connected: false,
-
   roomCode: 'undefined',
-
-  onLandingPage: true,
-  inLobby: false,
-  choosingArticle: false,
-  playingGame: false,
-  
-
+  frontendMode: PageModes.OnLandingPage,
   game: {
     id: undefined,
     room_code: undefined,
@@ -21,13 +22,11 @@ export const state = reactive({
     current_round: undefined,
     game_started: false
   },
-
   activeArticle: {
     id: undefined,
     wiki_id: undefined,
     title: undefined,
   },
-
   playerSelf: {
     id: undefined,
     game_id: undefined,
@@ -38,7 +37,6 @@ export const state = reactive({
     is_interrogator: undefined,
     is_honest: undefined,
   },
-
   playersArticle :{
     id: undefined,
     wiki_id: undefined,
@@ -46,8 +44,6 @@ export const state = reactive({
   },
   playerList: [],
   articleOptions: [],
-
-
 });
 
 // "undefined" means the URL will be computed from the `window.location` object
@@ -67,7 +63,7 @@ socket.on("disconnect", () => {
 
 function initPlayer(roomCode, player){
   state.roomCode = roomCode;
-  state.inLobby = true;
+  state.frontendMode = PageModes.InLobby;
   state.playerSelf = player;
 }
 
@@ -84,10 +80,14 @@ socket.on("deliveringPlayerList", (playerList) => {
   console.log(state.playerList);
 })
 
+socket.on("gameStarted", () => {
+  socket.emit("requestArticleOptions");
+});
+
 socket.on("deliveringArticleOptions", (articleOptions) => {
   console.log("article option delivery!");
   state.articleOptions = articleOptions;
-  console.log(state.articleOptions);
+  state.frontendMode = PageModes.ChoosingArticle;
 })
 
 socket.on("youJoined", (roomCode, player) => {
@@ -95,10 +95,7 @@ socket.on("youJoined", (roomCode, player) => {
   socket.emit("requestPlayerList");
 })
 
-socket.on("playerJoined", (player) => {
-  state.playerList.push(player);
-  console.log(state.playerList[1]);
-})
+socket.on("playerJoined", (player) => { state.playerList.push(player); })
 
 socket.on("playerLeft", (name) => {console.log(name);})
 
@@ -114,23 +111,15 @@ socket.on("playerUpdated", (affectsMe, playerData) => {
   console.log(state.playerSelf);
 })
 
-// function isTargetPlayer(player) {
-//   return player.id === 
-// }
+socket.on("articleRegistered", (returnedArticle) => {
+  state.playersArticle = returnedArticle;
+  state.FrontEndState = FrontEndStates.ReadingArticle;
+})
 
 
+socket.on("errorSocketIdNotUnique", () => { alert("Player's socket ID is already in a game"); });
+socket.on("errorNoRoomFound", () => { alert("No Room Found with that code"); });
 
-socket.on("errorSocketIdNotUnique", () => {
-  console.log("Player's socket ID is already in a game")
-});
-socket.on("errorNoRoomFound", () => {
-  console.log("No Room Found with that code")
-});
-
-socket.on("gameStarted", () => {})
-socket.on("sentArticleOptions", (options) => {
-  console.log(options);
-});
 socket.on("activeArticleUpdated", () => {})
 socket.on("scoreUpdated", () => {})
 socket.on("roundUpdated", () => {})

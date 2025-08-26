@@ -6,5 +6,6 @@ export const defaultParams = {
     list: "random",
     rnlimit: 1,
     rnnamespace: 0,
+    rnminsize: 15000,
 }
 export const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
