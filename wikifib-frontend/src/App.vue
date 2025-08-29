@@ -5,9 +5,11 @@
   import ArticlePortal from '@/components/ArticlePortal.vue';
   import HowToPlay from './components/HowToPlay.vue';
   import GameplayPage from './components/GameplayPage.vue';
+  import PlayerInfo from './components/PlayerInfo.vue';
   const frontendMode = () => {return state.frontendMode};
   const tutorialWindow = () => {return state.tutorialWindow};
   const toggleTutorialWindow = () => {state.tutorialWindow = !state.tutorialWindow};
+  const inRoom = () => {return (state.roomCode !== 'undefined')};
 </script>
 
 <style>
@@ -48,10 +50,17 @@
     padding: 5%;
     border-radius:100%
   }
+  .right-aligned{
+    text-align: right;
+    text-transform: uppercase;
+  }
 </style>
 
 <template>
   <button class="how-to-button" @click="toggleTutorialWindow()">?</button>
+  <div class="right-aligned">
+  <PlayerInfo v-if="inRoom()"/>
+  </div>
   <HowToPlay v-if="tutorialWindow()"/>
   <h1 class="main-header">wikifib</h1>
   <h2 class="subtitle">A party game about learning and lying.</h2>

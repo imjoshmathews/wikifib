@@ -126,8 +126,10 @@ io.on("connection", (socket: Socket) => {
             const honestPlayer = await databaseApi.getHonestPlayer(player.game_id);
             const activeArticleId = await databaseApi.getArticleIdFromPlayerId(honestPlayer.id);
             activeArticle = await databaseApi.getArticleObject(activeArticleId);
+            let activeGame: Game = await databaseApi.getGameObject(player.game_id);
             io.to(socket.id).emit('playerUpdated', player);
             io.to(socket.id).emit('deliveringActiveArticle', activeArticle);
+            io.to(socket.id).emit('deliveringGameData', activeGame)
             io.to(roomCode).emit('playerRejoined');
         } else io.to(socket.id).emit('errorGameNoLongerExists');
     })
@@ -181,17 +183,15 @@ io.on("connection", (socket: Socket) => {
     })
 
     socket.on("guessPlayer", async (guessedPlayer: Player) => {
-        if(!player.is_interrogator){
-            io.to(player.socket_id).emit("errorNotInterrogator");
-            return;
-        };
         guessedPlayer.score += 10;
         if(guessedPlayer.is_honest) {
             player.score += 15;
-        }
+        };
         await databaseApi.updatePlayer(guessedPlayer);
         await databaseApi.updatePlayer(player);
-        io.to(roomCode).emit("playerGuessed");
+        io.to(guessedPlayer.socket_id).emit("playerUpdated", guessedPlayer);
+        io.to(player.socket_id).emit("playerUpdated", player);
+        io.to(roomCode).emit("playerGuessed", guessedPlayer);
     });
 
     socket.on("promotePlayerToHost", async (player: Player) => {
@@ -202,8 +202,10 @@ io.on("connection", (socket: Socket) => {
         const oldHost: Player = await databaseApi.getHost(player.game_id);
         databaseApi.setPlayerHost(oldHost.game_id,oldHost.id,false);
         databaseApi.setPlayerHost(player.game_id, player.id, true);
-        io.to(roomCode).emit("hostChanged");
+        io.to(player.socket_id).emit("playerUpdated");
+        io.to(oldHost.socket_id).emit("playerUpdated");
     });
+    
     socket.on("selectedArticle", async (selectedArticle: Article) => {
         const playerHasArticle = await databaseApi.doesArticleForPlayerExist(selectedArticle.player_id);
         if(playerHasArticle){ await databaseApi.deleteArticleFromDatabase(playersArticle.id); };

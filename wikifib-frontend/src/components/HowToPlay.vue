@@ -1,6 +1,5 @@
 <script setup>
-    import {state} from '@/socket';
-    const tutorialWindow = () => { return state.tutorialWindow}
+    import {state, clearSession} from '@/socket';
     const closePopup = () => { state.tutorialWindow = false }
 </script>
 <style>
@@ -17,6 +16,8 @@
 <template>
     <div class="popup">
         <p>fill this in later with an explanation of how the game works.</p>
-        <button @click="closePopup">close</button>
+        <button @click="clearSession()">clear cache</button>
+        <button @click="closePopup()">close tutorial</button>
     </div>
+    
 </template>

@@ -1,24 +1,21 @@
 <script setup>
-    import {state} from '@/socket';
+    import {state, socket} from '@/socket';
 
     const playerSelf = () => {return state.playerSelf};
     const activeArticle = () => {return state.activeArticle};
     const interrogatorPlayerList = () => {return (state.playerList.filter(player => player.id!==state.playerSelf.id))};
-    const guessPlayer = (player) => {alert(`are you sure you want to guess ${player.screenname}?`)};
-
+    const guessPlayer = (player) => {
+        if(window.confirm(`Are you sure you want to guess ${player.screenname}?`)){
+            socket.emit("guessPlayer", player);
+        }
+    }
 </script>
 <style>
 </style>
 <template>
     <span>
-        THE CURRENT ARTICLE IS {{activeArticle().title}}
-    </span><br>
-    <span>YOU ARE {{playerSelf().screenname}}, YOU HAVE {{playerSelf().score}} POINTS AND</span>
-    <span v-if="playerSelf().is_host">
-        YOU ARE HOST
-    </span>
-    <span v-else>
-        YOU ARE NOT HOST
+        THE CURRENT ARTICLE IS<br>
+        <h1>{{activeArticle().title}}</h1>
     </span><br>
     <span v-if="playerSelf().is_honest">
         THIS IS YOUR ARTICLE! BE HONEST!

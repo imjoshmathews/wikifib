@@ -76,6 +76,11 @@ function loadSession(){
 }
 loadSession();
 
+export function clearSession(){
+  sessionStorage.clear();
+  window.location.reload(true);
+}
+
 
 socket.on("connect", () => {
   state.connected = true;
@@ -155,14 +160,20 @@ socket.on("newActiveArticle", (newActiveArticle) => {
   socket.emit("requestPlayerList");
 })
 
+socket.on("playerGuessed", (guessedPlayer) => {
+  socket.emit("requestPlayerList");
+  autosaveSession();
+  const correctness = guessedPlayer.is_honest ? "honest" : "a liar"; 
+  alert(`The interrogator guessed ${guessedPlayer.screenname} and ${guessedPlayer.screenname} was ${correctness}!`);
+})
+
 
 socket.on("errorSocketIdNotUnique", () => { alert("ERROR: Player's socket ID is already in a game"); });
 socket.on("errorNoRoomFound", () => { alert("ERROR: No room found with that code"); });
 socket.on("errorGameAlreadyStarted", () => {alert("ERROR: Game already started :(")});
 socket.on("errorGameNoLongerExists", () => {
   alert("ERROR: Game no longer exists!\nReloading page and clearing session storage.");
-  sessionStorage.clear();
-  window.location.reload(true);
+  clearSession();
 })
 socket.on("activeArticleUpdated", () => {})
 socket.on("scoreUpdated", () => {})
@@ -171,16 +182,9 @@ socket.on("interrogatorUpdated", () => {})
 
 socket.on("playerKicked", () => {})
 socket.on("playerPromoted", () => {})
-socket.on("playerGuessed", () => {})
-socket.on("youAreInterrogator", () => {})
-socket.on("youAreNotInterrogator",() => {})
-socket.on("youAreHonest", () => {})
-socket.on("youAreNotHonest",() => {})
+
 
 // outbound events
-socket.on("createGame", () => {})
-socket.on("joinGame", () => {})
-
 socket.on("leaveGame", () => {})
 socket.on("endGame", () => {})
 socket.on("kickPlayer", () => {})
