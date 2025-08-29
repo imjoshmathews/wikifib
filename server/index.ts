@@ -45,19 +45,28 @@ io.on("connection", (socket: Socket) => {
         game_id: undefined,
         socket_id: socket.id,
         screenname: undefined,
-        score: undefined,
-        is_host: undefined,
-        is_interrogator: undefined,
-        is_honest: undefined,
-        is_connected: true,
+        score: 0,
+        is_host: false,
+        is_interrogator: false,
+        is_honest: false,
+        is_ready: false,
+        is_connected: false,
     }
 
-    let article: Article = {
+    let playersArticle: Article = {
         id: undefined,
         player_id: undefined,
         wiki_id: undefined,
         title: undefined,
     }
+
+    let activeArticle: Article = {
+        id: undefined,
+        player_id: undefined,
+        wiki_id: undefined,
+        title: undefined,
+    }
+
 
     let roomCode: string;
 
@@ -72,15 +81,83 @@ io.on("connection", (socket: Socket) => {
             player = newGameOutput[0];
             roomCode = newGameOutput[1];
             io.to(socket.id).emit("gameCreated",roomCode, player);
-            io.to(socket.id).emit("playerUpdated",true,player);
+            io.to(socket.id).emit("playerUpdated",player);
             socket.join(roomCode);
             console.log(socket.rooms);
         } else { io.to(player.socket_id).emit("errorSocketIdNotUnique"); }
     });
-    socket.on("requestPlayerList", async() => {
-        const playerList = await databaseApi.getAllPlayerObjects(player.game_id);
-        io.to(roomCode).to(socket.id).emit("deliveringPlayerList", playerList);
+
+    socket.on("joinGame", async (rawRoomCode: string, screenname: string) => {
+        const socketIdUnique = await databaseApi.isSocketIdUnique(socket.id);
+            if(rawRoomCode === null){io.to(player.socket_id).emit("errorNoRoomCodeProvided");
+                return;
+            };
+            roomCode = rawRoomCode.toUpperCase();
+            const roomExists = await databaseApi.doesRoomCodeExist(roomCode);
+            if(!roomExists){
+                io.to(player.socket_id).emit("errorNoRoomFound");
+                return;
+            } else if(!socketIdUnique){
+                io.to(player.socket_id).emit("errorSocketIdNotUnique");
+                return;
+            } else{
+                const gameId = await databaseApi.getGameIdFromRoomCode(roomCode);
+                const game = await databaseApi.getGameObject(gameId);
+                if(!game.game_started){
+                    player.screenname = screenname;
+                    player.game_id = gameId;
+                    player.is_connected = true;
+                    player.id = await databaseApi.addPlayerToGame(roomCode, player);
+                    socket.join(roomCode);
+                    socket.to(roomCode).emit("playerJoined");
+                    io.to(socket.id).emit("youJoined", roomCode, player);
+                } else {io.to(socket.id).emit("errorGameAlreadyStarted"); }
+            } 
+    });
+
+    socket.on("playerReconnecting", async (loadedRoomCode: string, loadedPlayer: Player) => {
+        const gameExists = await databaseApi.doesGameExist(loadedPlayer.game_id);
+        if(gameExists) {
+            roomCode = loadedRoomCode;
+            socket.join(roomCode);
+            player = loadedPlayer;
+            player.socket_id = socket.id;
+            await databaseApi.updatePlayer(player);
+            const honestPlayer = await databaseApi.getHonestPlayer(player.game_id);
+            const activeArticleId = await databaseApi.getArticleIdFromPlayerId(honestPlayer.id);
+            activeArticle = await databaseApi.getArticleObject(activeArticleId);
+            io.to(socket.id).emit('playerUpdated', player);
+            io.to(socket.id).emit('deliveringActiveArticle', activeArticle);
+            io.to(roomCode).emit('playerRejoined');
+        } else io.to(socket.id).emit('errorGameNoLongerExists');
     })
+
+    socket.on("startGame", async () => {
+        let game = await databaseApi.getGameObject(player.game_id);
+        if(game.game_started){
+            io.to(socket.id).emit("errorGameStarted");
+        }
+        else{ 
+            game.game_started = true;
+            await databaseApi.updateGame(game);
+            io.to(roomCode).emit("gameStarted");
+        }
+    });
+
+    socket.on("leaveGame", () => {
+        playerExit(player, socket, roomCode);
+    });
+
+    socket.on("endGame", async (roomCode: string) => {
+        if(player.is_host){
+            const gameId: number = await databaseApi.getGameIdFromRoomCode(roomCode);
+            await databaseApi.deleteGameFromDatabase(gameId);
+            io.to(roomCode).emit("gameEnded");
+        } else {io.to(player.socket_id).emit("errorNotHost")}
+    });
+
+    socket.on("requestPlayerList", async () => { pushPlayerList(); })
+
     socket.on("requestArticleOptions", async() => {
         const numberOfOptions: number = await databaseApi.getGameMaxArticles(player.game_id);
         let articleOptions: Array<Article> = [];
@@ -97,87 +174,117 @@ io.on("connection", (socket: Socket) => {
         console.log(articleOptions);
         io.to(socket.id).emit("deliveringArticleOptions", articleOptions);
     })
-    socket.on("joinGame", async (rawRoomCode: string, screenname: string) => {
-        const socketIdUnique = await databaseApi.isSocketIdUnique(socket.id);
-        if(rawRoomCode === null){io.to(player.socket_id).emit("errorNoRoomCodeProvided");
+
+    socket.on("requestGameData", async () => {
+        const gameData = await databaseApi.getGameObject(player.game_id);
+        io.to(socket.id).emit("deliveringGameData", gameData);
+    })
+
+    socket.on("guessPlayer", async (guessedPlayer: Player) => {
+        if(!player.is_interrogator){
+            io.to(player.socket_id).emit("errorNotInterrogator");
             return;
         };
-        roomCode = rawRoomCode.toUpperCase();
-        const roomExists = await databaseApi.doesRoomCodeExist(roomCode);
-        if(!roomExists){
-            io.to(player.socket_id).emit("errorNoRoomFound");
-            return;
-        } else if(!socketIdUnique){
-            io.to(player.socket_id).emit("errorSocketIdNotUnique");
-            return;
-        } else{
-            player.screenname = screenname;
-            player.game_id = await databaseApi.getGameIdFromRoomCode(roomCode);
-            player.id = await databaseApi.addPlayerToGame(roomCode, player);
-            socket.join(roomCode);
-            socket.to(roomCode).emit("playerJoined",player);
-            io.to(socket.id).emit("youJoined", roomCode, player)
+        guessedPlayer.score += 10;
+        if(guessedPlayer.is_honest) {
+            player.score += 15;
         }
+        await databaseApi.updatePlayer(guessedPlayer);
+        await databaseApi.updatePlayer(player);
+        io.to(roomCode).emit("playerGuessed");
     });
-    socket.on("startGame", () => {
-        io.to(roomCode).emit("gameStarted");
-    });
-    socket.on("leaveGame", () => {
-        playerExit(player, socket, roomCode);
-    });
-    socket.on("endGame", async (roomCode: string) => {
-        if(player.is_host){
-            const gameId: number = await databaseApi.getGameIdFromRoomCode(roomCode);
-            await databaseApi.deleteGameFromDatabase(gameId);
-            io.to(roomCode).emit("gameEnded");
-        } else {io.to(player.socket_id).emit("errorNotHost")}
-    });
-    socket.on("guessPlayer", async (guessedPlayer: Player) => {
-        if(player.is_interrogator){
-            guessedPlayer.score += 1;
-            if(guessedPlayer.is_honest) {
-                player.score += 2;
-            }
-            await databaseApi.updatePlayer(guessedPlayer);
-            await databaseApi.updatePlayer(player);
-            io.to(roomCode).emit("playerGuessed");
-        } else {io.to(player.socket_id).emit("errorNotInterrogator")}
-    });
+
     socket.on("promotePlayerToHost", async (player: Player) => {
-        if(player.is_host){
-            const oldHost: Player = await databaseApi.getHost(player.game_id);
-            databaseApi.setPlayerHost(oldHost.game_id,oldHost.id,false);
-            databaseApi.setPlayerHost(player.game_id, player.id, true);
-        } else {io.to(player.socket_id).emit("errorNotHost")}
+        if(!player.is_host){
+            io.to(player.socket_id).emit("errorNotHost");
+            return;
+        }
+        const oldHost: Player = await databaseApi.getHost(player.game_id);
+        databaseApi.setPlayerHost(oldHost.game_id,oldHost.id,false);
+        databaseApi.setPlayerHost(player.game_id, player.id, true);
+        io.to(roomCode).emit("hostChanged");
     });
     socket.on("selectedArticle", async (selectedArticle: Article) => {
         const playerHasArticle = await databaseApi.doesArticleForPlayerExist(selectedArticle.player_id);
-        if(playerHasArticle){ await databaseApi.deleteArticleFromDatabase(article.id); };
-        article = selectedArticle;
-        article.id = await databaseApi.addArticleToDatabase(article);
-        console.log(player.screenname,"selected article",article);
-        io.to(socket.id).emit("articleRegistered", article);
+        if(playerHasArticle){ await databaseApi.deleteArticleFromDatabase(playersArticle.id); };
+        playersArticle = selectedArticle;
+        playersArticle.id = await databaseApi.addArticleToDatabase(playersArticle);
+        console.log(player.screenname,"selected article",playersArticle);
+        io.to(socket.id).emit("articleRegistered", playersArticle);
     });
+    socket.on("playerReady", async () => {
+        player.is_ready = true;
+        await databaseApi.updatePlayer(player);
+        io.to(socket.id).emit("playerUpdated",player);
+        const gameReady = await databaseApi.readyCheck(player.game_id);
+        if(gameReady){
+            await roundStart(player.game_id);
+            player = await databaseApi.getPlayerObject(player.id);
+            const interrogator = await databaseApi.getInterrogator(player.game_id);
+            const honestPlayer = await databaseApi.getHonestPlayer(player.game_id);
+            const activeArticleId = await databaseApi.getArticleIdFromPlayerId(honestPlayer.id);
+            activeArticle = await databaseApi.getArticleObject(activeArticleId);
+            io.to(interrogator.socket_id).emit("playerUpdated",interrogator);
+            io.to(honestPlayer.socket_id).emit("playerUpdated",honestPlayer);
+            io.to(roomCode).emit("gameStarting")
+            console.log("delivering new active article", activeArticle);
+            io.to(roomCode).emit("newActiveArticle",activeArticle);
+        }
+    });
+
     socket.on("disconnect", (reason: DisconnectReason) => {
         console.log("Socket has disconnected:", socket.id,reason);
-        pushPlayerList(player, roomCode);
-        if(typeof player.game_id !== undefined) { playerExit(player, socket, roomCode) };
+        player.is_connected = false;
+        if(typeof player.game_id !== undefined) { 
+            console.log("Player was assigned to a game. handling disconnect.");
+            handleDisconnect(player, socket, roomCode);
+            pushPlayerList();
+        } else console.log("Player was not assigned to a game.");
     });
     
+    async function pushPlayerList() {
+        const playerList = await databaseApi.getAllConnectedPlayers(player.game_id);
+        io.to(roomCode).to(socket.id).emit("deliveringPlayerList", playerList);
+    }
+
+    async function pushPlayerUpdate() {
+        io.to(socket.id).emit("playerUpdated", player);
+    }
+
     //io.on("shuffleArticles", () => {})
     //io.on("kickPlayer", () => {})
 });
 
+async function handleDisconnect(player: Player, socket: Socket, roomCode: string){
+    player.is_connected = false;
+    await databaseApi.updatePlayer(player);
+    const gameEmpty: boolean = await databaseApi.isGameEmpty(player.game_id);
+    if(gameEmpty) {
+        console.log("empty game will be deleted."); 
+        await databaseApi.deleteGameFromDatabase(player.game_id);
+    } else {
+        console.log("player left a non-empty game")
+        io.to(roomCode).emit("playerLeft");
+        socket.leave(roomCode)
+        if(player.is_host){
+            // assignRandomHost();
+        }
+        if(player.is_interrogator || player.is_honest){
+            // endRoundEarly();
+        }
+    };
+}
+
 async function playerExit(player: Player, socket: Socket, roomCode: string){
     await databaseApi.deletePlayerFromDatabase(player.id);
     const gameEmpty: boolean = await databaseApi.isGameEmpty(player.game_id);
-    // if(gameEmpty) { console.log("empty game will be deleted."); 
-    // await databaseApi.deleteGameFromDatabase(player.game_id); }
+    if(gameEmpty) {
+        console.log("empty game will be deleted."); 
+        await databaseApi.deleteGameFromDatabase(player.game_id);
+    }
     // else {
         io.to(roomCode).emit("playerLeft", player.screenname);
-        const playerList = await databaseApi.getAllPlayerObjects(player.game_id);
-        io.to(roomCode).emit("deliveringPlayerList", playerList);
-        socket.leave(roomCode);
+        socket.leave(roomCode)
         if(player.is_host){
             // assignRandomHost();
         }
@@ -187,52 +294,56 @@ async function playerExit(player: Player, socket: Socket, roomCode: string){
     // };
 }
 
-async function pushPlayerList(player, roomCode){
-    const playerList = await databaseApi.getAllPlayerObjects(player.game_id);
-    console.log(playerList);
-    io.to(roomCode).emit("deliveringPlayerList", playerList);
+async function roundStart(gameId: number) {
+    await assignGameRoles(gameId);
+    let game = await databaseApi.getGameObject(gameId);
+    game.current_round++;
+    await databaseApi.updateGame(game);
 }
 
-// async function gameStart(gameId: number): Promise<Game>{
-//     let game: Game = await databaseApi.getGameObject(gameId);
-//     io.to(game.room_code).emit('gameStarted')
-//     game.current_round++;
-// }
-
-async function roundStart() {
-
-}
-
-async function assignHonestPlayer(gameId: number){
-    const playerList: Array<Player> = await databaseApi.getAllPlayerObjects(gameId);
+async function oldAssignGameRoles(gameId: number){
+    let playerList: Array<Player> = await databaseApi.getAllPlayerObjects(gameId);
     let candidates: Array<Player> = [];
+    let interrogator: Player = undefined;
     for (const player of playerList) {
         if (!player.is_honest){
             candidates.push(player);
         } else {
-            databaseApi.setPlayerInterrogator(player.game_id, player.id, true);
-            databaseApi.setPlayerHonest(player.game_id,player.id,false);
-        }  
+            await databaseApi.setPlayerInterrogator(player.game_id, player.id, true);
+            await databaseApi.setPlayerHonest(player.game_id,player.id,false);
+            interrogator = player;
+        }
+    } if(interrogator === undefined){
+        let index: number = Math.floor(Math.random() * candidates.length);
+        interrogator = candidates[index];
+        candidates.splice(index,1);
     }
-    const honestPlayer = candidates[Math.floor(Math.random() * candidates.length)];
+    const newHonestPlayer: Player = candidates[Math.floor(Math.random() * candidates.length)];
     for (const player of candidates) {
-        databaseApi.setPlayerInterrogator(player.game_id, player.id, false);
-        if(player === honestPlayer){ databaseApi.setPlayerHonest(player.game_id,player.id,true); }
+        await databaseApi.setPlayerInterrogator(player.game_id, player.id, false);
+        if(player === newHonestPlayer){ 
+            await databaseApi.setPlayerHonest(player.game_id,player.id,true);
+        }
     }
 }
 
-async function initPlayer(roomCode: string, player: Player) {
-    await databaseApi.addPlayerToGame(roomCode, player);
-    generatePlayerArticles(player);
-};
+async function assignGameRoles(gameId: number){
+    let playerList: Array<Player> = await databaseApi.getAllPlayerObjects(gameId);
+    let interrogator: Player = playerList.find(player => player.is_honest) ?? playerList[Math.floor(Math.random() * playerList.length)];
+    let candidates: Array<Player> = playerList.filter(player => player.id!==interrogator.id);
+    const honestPlayer: Player = candidates[Math.floor(Math.random() * candidates.length)];
+    let liars: Array<Player> = candidates.filter(player => player.id!==honestPlayer.id);
+    for (const player of liars){
+        await databaseApi.setPlayerInterrogator(gameId,player.id,false);
+        await databaseApi.setPlayerHonest(gameId,player.id,false);
+    }
+    await databaseApi.setPlayerHonest(gameId, honestPlayer.id, true);
+    await databaseApi.setPlayerHonest(gameId, interrogator.id, false);
+    await databaseApi.setPlayerInterrogator(gameId,interrogator.id,true);
+    await databaseApi.setPlayerInterrogator(gameId,honestPlayer.id,false);
+}
 
 httpServer.listen(3666);
-
-const defaultOptions: GameOptions = {
-    max_score: 10,
-    max_articles: 3,
-    max_rounds: 5,
-}
 
 function stringifyWikiQuery(params: QueryParams): string {
     let url: string = wikiApiRoot + "?origin=*";
@@ -246,22 +357,23 @@ async function fetchRandomArticle(): Promise<RandomResults> {
     return randomResults;
 }
 
-async function generatePlayerArticles(player: Player): Promise<Array<any>>{
-    const playerId: number = await databaseApi.getPlayerIdFromSocketId(player.socket_id);
-    const gameId: number = await databaseApi.getGameIdFromPlayerId(playerId);
-    const maxArticles: number = await databaseApi.getGameMaxArticles(gameId);
-    let articleOptions: Array<any> = [];
-    for(let i=0; i < maxArticles; i++){
-        const randomResults: RandomResults = await fetchRandomArticle();
-        await articleOptions.push(randomResults);
-    } 
-    await io.to(player.socket_id).emit('sentArticleOptions',{options:articleOptions});
-    return articleOptions;
-}
+// async function generatePlayerArticles(player: Player): Promise<Array<any>>{
+//     const playerId: number = await databaseApi.getPlayerIdFromSocketId(player.socket_id);
+//     const gameId: number = await databaseApi.getGameIdFromPlayerId(playerId);
+//     const maxArticles: number = await databaseApi.getGameMaxArticles(gameId);
+//     let articleOptions: Array<any> = [];
+//     for(let i=0; i < maxArticles; i++){
+//         const randomResults: RandomResults = await fetchRandomArticle();
+//         await articleOptions.push(randomResults);
+//     } 
+//     await io.to(player.socket_id).emit('sentArticleOptions',{options:articleOptions});
+//     return articleOptions;
+// }
 
 async function createNewGame(initOptions: InitOptions, firstPlayer: Player): Promise<Array<any>>{
     const gameId: number = await databaseApi.addGameToDatabase(initOptions.gameOptions);
     firstPlayer.game_id = gameId;
+    firstPlayer.is_connected = true;
     const roomCode: string = await databaseApi.getRoomCode(gameId);
     const playerId: number = await databaseApi.addPlayerToGame(roomCode, firstPlayer);
     firstPlayer.id = playerId;
@@ -269,20 +381,3 @@ async function createNewGame(initOptions: InitOptions, firstPlayer: Player): Pro
     await databaseApi.setPlayerHost(gameId, playerId, true);
     return [firstPlayer, roomCode];
 }
-
-// async function populateArticleList(params: QueryParams, player: Player){
-//     const wikiQueryResults: WikiQueryResults = await fetchRandomArticles(params);
-//     const randomResults: RandomFetchResults = wikiQueryResults.query;
-//     player.articleOptions = randomResults;
-//     console.log(player);
-// }
-
-// function dealOutArticles(params: QueryParams, playerList: Array<Player>){
-//     for(let p in playerList){
-//         populateArticleList(params, playerList[p])
-//     }
-// }
-
-//addArticleToDatabase(defaultParams, 1);
-
-// test();

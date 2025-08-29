@@ -55,5 +55,6 @@ export interface Player {
     is_host: boolean,
     is_interrogator: boolean,
     is_honest: boolean,
+    is_ready: boolean,
     is_connected: boolean,
 }

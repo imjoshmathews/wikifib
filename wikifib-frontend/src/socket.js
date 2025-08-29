@@ -2,15 +2,16 @@ import { reactive } from "vue";
 import { io } from "socket.io-client";
 
 export const PageModes = {
-  OnLandingPage: Symbol("OnLandingPage"),
-  InLobby: Symbol("InLobby"),
-  ChoosingArticle: Symbol("ChoosingArticle"),
-  ReadingArticle: Symbol("ReadingArticle"),
-  PlayingGame: Symbol("PlayingGame"),
+  OnLandingPage: 'OnLandingPage',
+  InLobby: 'InLobby',
+  ChoosingArticle: 'ChoosingArticle',
+  ReadingArticle: 'ReadingArticle',
+  PlayingGame: 'PlayingGame',
 }
 
 export const state = reactive({
   connected: false,
+  tutorialWindow: false,
   roomCode: 'undefined',
   frontendMode: PageModes.OnLandingPage,
   game: {
@@ -24,6 +25,7 @@ export const state = reactive({
   },
   activeArticle: {
     id: undefined,
+    player_id: undefined,
     wiki_id: undefined,
     title: undefined,
   },
@@ -36,9 +38,11 @@ export const state = reactive({
     is_host: undefined,
     is_interrogator: undefined,
     is_honest: undefined,
+    is_ready: undefined,
   },
   playersArticle :{
     id: undefined,
+    player_id: undefined,
     wiki_id: undefined,
     title: undefined,
   },
@@ -53,6 +57,25 @@ export const state = reactive({
 
 export const socket = io("https://socket.wikifib.com",{});
 
+function autosaveSession(){
+  sessionStorage.setItem('frontendMode',state.frontendMode);
+  sessionStorage.setItem('roomCode',state.roomCode);
+  sessionStorage.setItem('playerSelf',JSON.stringify(state.playerSelf));
+  sessionStorage.setItem('articleOptions',JSON.stringify(state.articleOptions));
+}
+function loadSession(){
+  if(sessionStorage.getItem('frontendMode')===null) return;
+  state.frontendMode = sessionStorage.getItem('frontendMode');
+  if(sessionStorage.getItem('roomCode')===null) return;
+  state.roomCode = sessionStorage.getItem('roomCode');
+  state.playerSelf = JSON.parse(sessionStorage.getItem('playerSelf'));
+  if(sessionStorage.getItem('articleOptions')!==null){
+    state.articleOptions = JSON.parse(sessionStorage.getItem('articleOptions'));
+  }
+  socket.emit('playerReconnecting', state.roomCode, state.playerSelf);
+}
+loadSession();
+
 
 socket.on("connect", () => {
   state.connected = true;
@@ -65,29 +88,38 @@ function initPlayer(roomCode, player){
   state.roomCode = roomCode;
   state.frontendMode = PageModes.InLobby;
   state.playerSelf = player;
+  autosaveSession();
 }
 
 // inbound events
 socket.on("gameCreated", (roomCode, player) => {
   initPlayer(roomCode, player);
-  socket.emit("requestPlayerList");
-  socket.emit("requestGameInfo");
 })
 
 socket.on("deliveringPlayerList", (playerList) => {
   console.log("playerlist delivery!");
   state.playerList = playerList;
-  console.log(state.playerList);
+  autosaveSession();
 })
 
-socket.on("gameStarted", () => {
-  socket.emit("requestArticleOptions");
+socket.on("gameStarted", async () => {
+  await socket.emit("requestArticleOptions");
 });
 
 socket.on("deliveringArticleOptions", (articleOptions) => {
   console.log("article option delivery!");
   state.articleOptions = articleOptions;
   state.frontendMode = PageModes.ChoosingArticle;
+  autosaveSession();
+})
+
+socket.on("deliveringGameData", (gameData) => {
+  // console.log("Game Data delivery!");
+  state.game = gameData;
+})
+
+socket.on("deliveringActiveArticle", (activeArticle) =>{
+  state.activeArticle = activeArticle;
 })
 
 socket.on("youJoined", (roomCode, player) => {
@@ -95,31 +127,43 @@ socket.on("youJoined", (roomCode, player) => {
   socket.emit("requestPlayerList");
 })
 
-socket.on("playerJoined", (player) => { state.playerList.push(player); })
+socket.on("playerJoined", () => {socket.emit("requestPlayerList")})
+socket.on("playerRejoined", () => {socket.emit("requestPlayerList")})
+socket.on("playerLeft", () => {socket.emit("requestPlayerList")})
 
-socket.on("playerLeft", (name) => {console.log(name);})
-
-socket.on("playerUpdated", (affectsMe, playerData) => {
+socket.on("playerUpdated", (playerData) => {
   console.log("Player updated");
-  console.log("was it you?",affectsMe);
-  console.log(playerData);
-  if(affectsMe){ state.playerSelf = playerData };
-  const index = state.playerList.findIndex(player => player.id === playerData.id);
-  if(index > -1){state.playerList[index] = playerData}
-  else{state.playerList.push(playerData)};
-  console.log(state.playerList);
-  console.log(state.playerSelf);
+  state.playerSelf = playerData;
+  socket.emit("requestPlayerList");
+  socket.emit("requestGameData");
+  socket.emit("requestActiveArticle");
 })
 
 socket.on("articleRegistered", (returnedArticle) => {
   state.playersArticle = returnedArticle;
-  state.FrontEndState = FrontEndStates.ReadingArticle;
+  autosaveSession();
+})
+
+socket.on("gameStarting", () => {
+  state.frontendMode = PageModes.PlayingGame;
+  autosaveSession();
+})
+
+socket.on("newActiveArticle", (newActiveArticle) => {
+  console.log("received new active article!", newActiveArticle);
+  state.activeArticle = newActiveArticle;
+  socket.emit("requestPlayerList");
 })
 
 
-socket.on("errorSocketIdNotUnique", () => { alert("Player's socket ID is already in a game"); });
-socket.on("errorNoRoomFound", () => { alert("No Room Found with that code"); });
-
+socket.on("errorSocketIdNotUnique", () => { alert("ERROR: Player's socket ID is already in a game"); });
+socket.on("errorNoRoomFound", () => { alert("ERROR: No room found with that code"); });
+socket.on("errorGameAlreadyStarted", () => {alert("ERROR: Game already started :(")});
+socket.on("errorGameNoLongerExists", () => {
+  alert("ERROR: Game no longer exists!\nReloading page and clearing session storage.");
+  sessionStorage.clear();
+  window.location.reload(true);
+})
 socket.on("activeArticleUpdated", () => {})
 socket.on("scoreUpdated", () => {})
 socket.on("roundUpdated", () => {})
@@ -136,7 +180,7 @@ socket.on("youAreNotHonest",() => {})
 // outbound events
 socket.on("createGame", () => {})
 socket.on("joinGame", () => {})
-socket.on("startGame", () => {})
+
 socket.on("leaveGame", () => {})
 socket.on("endGame", () => {})
 socket.on("kickPlayer", () => {})
@@ -144,7 +188,3 @@ socket.on("guessPlayer", () => {})
 socket.on("promotePlayerToHost", () => {})
 socket.on("selectArticle", () => {})
 socket.on("shuffleArticles", () => {})
-
-socket.on("bar", (...args) => {
-  state.barEvents.push(args);
-});

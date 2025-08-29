@@ -3,7 +3,11 @@
   import RoomCodeLobby from '@/components/RoomCodeLobby.vue';
   import LandingPage from '@/components/LandingPage.vue';
   import ArticlePortal from '@/components/ArticlePortal.vue';
-  const frontendMode = () => {return state.frontendMode}
+  import HowToPlay from './components/HowToPlay.vue';
+  import GameplayPage from './components/GameplayPage.vue';
+  const frontendMode = () => {return state.frontendMode};
+  const tutorialWindow = () => {return state.tutorialWindow};
+  const toggleTutorialWindow = () => {state.tutorialWindow = !state.tutorialWindow};
 </script>
 
 <style>
@@ -38,13 +42,22 @@
     text-align: center;
     border-radius: 0.5rem;
   }
+  .how-to-button {
+    width: 0.5rem;
+    height: 0.5rem;
+    padding: 5%;
+    border-radius:100%
+  }
 </style>
 
 <template>
+  <button class="how-to-button" @click="toggleTutorialWindow()">?</button>
+  <HowToPlay v-if="tutorialWindow()"/>
   <h1 class="main-header">wikifib</h1>
   <h2 class="subtitle">A party game about learning and lying.</h2>
   <br>
   <LandingPage v-if="frontendMode()===PageModes.OnLandingPage"/>
   <RoomCodeLobby v-if="frontendMode()===PageModes.InLobby"/>
   <ArticlePortal v-if="frontendMode()===PageModes.ChoosingArticle"/>
+  <GameplayPage v-if="frontendMode()===PageModes.PlayingGame"/>
 </template>
