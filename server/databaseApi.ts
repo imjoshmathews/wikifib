@@ -20,18 +20,29 @@ export function generateRoomCode(length: number): string {
 export async function stripQueryToRows(results){
     return results.rows;
 };
+
 export async function queryDatabase(query: string, values?: Array<any>): Promise<Array<any>>{
     const client = await pool.connect();
     let res: Promise<any>;
-    if (typeof values !== 'undefined') {
-        res = await pool.query(query, values);
-    } else {
-        res = await pool.query(query);
-    }
+        if (typeof values !== 'undefined') {
+            try{
+                res = await pool.query(query, values);
+                res = await stripQueryToRows(res)
+            } catch(error){
+                res = error;
+            }
+        } else {
+            try{
+                res = await pool.query(query);
+                res = await stripQueryToRows(res)
+            } catch(error){
+                res = error;
+            }
+        }
     client.release();
-    res = await stripQueryToRows(res)
     return res;
 };
+
 export async function createUniqueRoomCode(): Promise<string>{
     const query: string = "SELECT EXISTS (SELECT * FROM games WHERE room_code = $1)";
     let values: Array<any>;

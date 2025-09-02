@@ -117,13 +117,24 @@ async function queryDatabase(query, values) {
     const client = await pool.connect();
     let res;
     if (typeof values !== 'undefined') {
-        res = await pool.query(query, values);
+        try {
+            res = await pool.query(query, values);
+            res = await stripQueryToRows(res);
+        }
+        catch (error) {
+            res = error;
+        }
     }
     else {
-        res = await pool.query(query);
+        try {
+            res = await pool.query(query);
+            res = await stripQueryToRows(res);
+        }
+        catch (error) {
+            res = error;
+        }
     }
     client.release();
-    res = await stripQueryToRows(res);
     return res;
 }
 ;

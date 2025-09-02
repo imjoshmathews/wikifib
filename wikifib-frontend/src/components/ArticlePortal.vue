@@ -2,7 +2,6 @@
     import {state, socket} from '@/socket';
     import { ref } from 'vue';
     const isReady = () => {return state.playerSelf.is_ready}
-    const doneReading = ref(false);
     const articleOptions = () => {return state.articleOptions};
     const playersArticle = () => {return state.playersArticle};
     const iframeUrl = () => {
@@ -31,6 +30,6 @@
         <iframe :src="iframeUrl()" width="100%" height="600" style="border:1px solid red;"/>
     </span>
     <span v-else class="aligned-center"> 
-        <h1>Thanks! Sit back and relax, the game will continue shortly.<br>Your article is:<br>{{playersArticle().title}}</h1>
+        <h1>Sit back and relax, the game will continue shortly.<br>Your article is:<br>{{playersArticle().title}}</h1>
     </span>
 </template>

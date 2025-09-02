@@ -1,5 +1,7 @@
 export const wikiApiRoot = "https://en.wikipedia.org/w/api.php";
 export const roomIdLength = 5;
+export const gotGuessedScore = 10;
+export const correctGuessScore = 15;
 export const defaultParams = {
     action: "query",
     format: "json",

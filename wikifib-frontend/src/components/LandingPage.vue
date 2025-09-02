@@ -21,7 +21,7 @@
           }
           const initOptions = {hostScreenname:name.value,gameOptions:gameOptions};
           console.log("create game fired")
-          await socket.emit("createGame", initOptions);
+          socket.emit("createGame", initOptions);
       } else alert("Your name cannot be empty!");
   }
   const joinGame = async () => {

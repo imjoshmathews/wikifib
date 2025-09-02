@@ -12,6 +12,8 @@ export const PageModes = {
 export const state = reactive({
   connected: false,
   tutorialWindow: false,
+  roundEndWindow: false,
+
   roomCode: 'undefined',
   frontendMode: PageModes.OnLandingPage,
   game: {
@@ -81,6 +83,9 @@ export function clearSession(){
   window.location.reload(true);
 }
 
+export function endRound(){
+
+}
 
 socket.on("connect", () => {
   state.connected = true;
@@ -104,10 +109,12 @@ socket.on("gameCreated", (roomCode, player) => {
 socket.on("deliveringPlayerList", (playerList) => {
   console.log("playerlist delivery!");
   state.playerList = playerList;
+  state.playerSelf = playerList.filter(p => p.id === state.playerSelf.id)[0];
   autosaveSession();
 })
 
 socket.on("gameStarted", async () => {
+  await socket.emit("requestGameData");
   await socket.emit("requestArticleOptions");
 });
 
@@ -121,11 +128,18 @@ socket.on("deliveringArticleOptions", (articleOptions) => {
 socket.on("deliveringGameData", (gameData) => {
   // console.log("Game Data delivery!");
   state.game = gameData;
+  autosaveSession();
 })
 
 socket.on("deliveringActiveArticle", (activeArticle) =>{
   state.activeArticle = activeArticle;
 })
+
+socket.on("newActiveArticle", (newActiveArticle) => {
+  state.activeArticle = newActiveArticle;
+  socket.emit("requestPlayerList");
+})
+
 
 socket.on("youJoined", (roomCode, player) => {
   initPlayer(roomCode, player);
@@ -139,9 +153,7 @@ socket.on("playerLeft", () => {socket.emit("requestPlayerList")})
 socket.on("playerUpdated", (playerData) => {
   console.log("Player updated");
   state.playerSelf = playerData;
-  socket.emit("requestPlayerList");
-  socket.emit("requestGameData");
-  socket.emit("requestActiveArticle");
+  autosaveSession();
 })
 
 socket.on("articleRegistered", (returnedArticle) => {
@@ -149,24 +161,37 @@ socket.on("articleRegistered", (returnedArticle) => {
   autosaveSession();
 })
 
-socket.on("gameStarting", () => {
-  state.frontendMode = PageModes.PlayingGame;
+socket.on("roundStarting", () => {
+  socket.emit("requestPlayerList");
+  socket.emit("requestActiveArticle");
+  socket.emit("requestGameData");
+  state.frontendMode = PageModes.PlayingGame; 
   autosaveSession();
 })
 
-socket.on("newActiveArticle", (newActiveArticle) => {
-  console.log("received new active article!", newActiveArticle);
-  state.activeArticle = newActiveArticle;
-  socket.emit("requestPlayerList");
-})
 
-socket.on("playerGuessed", (guessedPlayer) => {
+socket.on("playerGuessed", async (guessedPlayer) => {
   socket.emit("requestPlayerList");
   autosaveSession();
   const correctness = guessedPlayer.is_honest ? "honest" : "a liar"; 
   alert(`The interrogator guessed ${guessedPlayer.screenname} and ${guessedPlayer.screenname} was ${correctness}!`);
+  socket.emit("readyForNextRound");
 })
 
+socket.on("newRoundStarting", async () => {
+  state.frontendMode = PageModes.ChoosingArticle;
+    if(state.playerSelf.is_honest){
+      alert("You are the next interrogator. You'll have to read an article before the next round starts. Continue?");
+      await socket.emit("requestArticleOptions");
+    }
+  autosaveSession();
+})
+
+socket.on("gameOver", (winner) => {
+  if(state.playerSelf.id === winner.id){alert("congrats! you won!");}
+  else{alert("sorry, you didn't win this time!")};
+  clearSession();
+})
 
 socket.on("errorSocketIdNotUnique", () => { alert("ERROR: Player's socket ID is already in a game"); });
 socket.on("errorNoRoomFound", () => { alert("ERROR: No room found with that code"); });
