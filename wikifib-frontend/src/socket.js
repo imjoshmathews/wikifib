@@ -126,20 +126,12 @@ socket.on("deliveringArticleOptions", (articleOptions) => {
 })
 
 socket.on("deliveringGameData", (gameData) => {
-  // console.log("Game Data delivery!");
   state.game = gameData;
-  autosaveSession();
 })
 
 socket.on("deliveringActiveArticle", (activeArticle) =>{
   state.activeArticle = activeArticle;
 })
-
-socket.on("newActiveArticle", (newActiveArticle) => {
-  state.activeArticle = newActiveArticle;
-  socket.emit("requestPlayerList");
-})
-
 
 socket.on("youJoined", (roomCode, player) => {
   initPlayer(roomCode, player);
@@ -158,7 +150,6 @@ socket.on("playerUpdated", (playerData) => {
 
 socket.on("articleRegistered", (returnedArticle) => {
   state.playersArticle = returnedArticle;
-  autosaveSession();
 })
 
 socket.on("roundStarting", () => {
@@ -178,12 +169,20 @@ socket.on("playerGuessed", async (guessedPlayer) => {
   socket.emit("readyForNextRound");
 })
 
+socket.on("youAreNextInterrogator", async () => {
+  alert("You are the next interrogator. You'll have to read an article before the next round starts. Continue?");
+  state.playersArticle = {
+    id: undefined,
+    player_id: undefined,
+    wiki_id: undefined,
+    title: undefined,
+  };
+  await socket.emit("requestArticleOptions");
+  socket.emit("newInterrogatorReady");
+});
+
 socket.on("newRoundStarting", async () => {
   state.frontendMode = PageModes.ChoosingArticle;
-    if(state.playerSelf.is_honest){
-      alert("You are the next interrogator. You'll have to read an article before the next round starts. Continue?");
-      await socket.emit("requestArticleOptions");
-    }
   autosaveSession();
 })
 

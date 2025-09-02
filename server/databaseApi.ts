@@ -104,7 +104,7 @@ export async function getGameIdFromPlayerId(playerId: number): Promise<number>{
     return results[0].game_id;
 };
 export async function isGameEmpty(gameId: number): Promise<boolean>{
-    const query: string = ("SELECT EXISTS (SELECT 1 FROM players WHERE game_id = $1)");
+    const query: string = ("SELECT EXISTS (SELECT 1 FROM players WHERE game_id = $1 AND is_connected = true)");
     const values: Array<any> = [gameId];
     const results = await queryDatabase(query,values);
     return !(results[0].exists);

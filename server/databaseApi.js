@@ -208,7 +208,7 @@ async function getGameIdFromPlayerId(playerId) {
 }
 ;
 async function isGameEmpty(gameId) {
-    const query = ("SELECT EXISTS (SELECT 1 FROM players WHERE game_id = $1)");
+    const query = ("SELECT EXISTS (SELECT 1 FROM players WHERE game_id = $1 AND is_connected = true)");
     const values = [gameId];
     const results = await queryDatabase(query, values);
     return !(results[0].exists);

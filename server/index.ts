@@ -60,12 +60,12 @@ io.on("connection", (socket: Socket) => {
         title: undefined,
     }
 
-    let activeArticle: Article = {
-        id: undefined,
-        player_id: undefined,
-        wiki_id: undefined,
-        title: undefined,
-    }
+    // let activeArticle: Article = {
+    //     id: undefined,
+    //     player_id: undefined,
+    //     wiki_id: undefined,
+    //     title: undefined,
+    // }
 
 
     let roomCode: string;
@@ -124,9 +124,6 @@ io.on("connection", (socket: Socket) => {
             player = loadedPlayer;
             player.socket_id = socket.id;
             await databaseApi.updatePlayer(player);
-            const honestPlayer = await databaseApi.getHonestPlayer(player.game_id);
-            const activeArticleId = await databaseApi.getArticleIdFromPlayerId(honestPlayer.id);
-            activeArticle = await databaseApi.getArticleObject(activeArticleId);
             await pushPlayerList();
             await pushActiveArticle();
             await pushGameData();
@@ -147,7 +144,6 @@ io.on("connection", (socket: Socket) => {
     });
 
     socket.on("leaveGame", () => {
-        playerExit(player, socket, roomCode);
     });
 
     socket.on("endGame", async (roomCode: string) => {
@@ -162,24 +158,9 @@ io.on("connection", (socket: Socket) => {
     socket.on("requestActiveArticle", async () => { pushActiveArticle(); })
     socket.on("requestGameData", async () => { pushGameData(); })
     socket.on("requestArticleOptions", async() => {
-
-        const numberOfOptions: number = await databaseApi.getGameMaxArticles(player.game_id);
-        let articleOptions: Array<Article> = [];
-        for(let i=0; i<numberOfOptions; i++){
-            const randomResults: RandomResults = await fetchRandomArticle();
-            const article: Article = {
-                id: undefined,
-                player_id: player.id,
-                wiki_id: randomResults.id,
-                title: randomResults.title,
-            }
-            articleOptions.push(article);
-        }
-        console.log(articleOptions);
+        const articleOptions = await generateArticleOptions();
         io.to(socket.id).emit("deliveringArticleOptions", articleOptions);
     })
-
-
 
     socket.on("guessPlayer", async (guessedPlayer: Player) => {
         guessedPlayer.score += constants.gotGuessedScore;
@@ -193,10 +174,12 @@ io.on("connection", (socket: Socket) => {
         }
         await databaseApi.updatePlayer(guessedPlayer);
         await databaseApi.updatePlayer(player);
+
         io.to(roomCode).emit("playerGuessed", guessedPlayer);
     });
 
     socket.on("promotePlayerToHost", async (player: Player) => {
+        // incomplete function
         if(!player.is_host){
             io.to(player.socket_id).emit("errorNotHost");
             return;
@@ -220,34 +203,40 @@ io.on("connection", (socket: Socket) => {
     socket.on("playerReady", async () => {
         player.is_ready = true;
         await databaseApi.updatePlayer(player);
+        const gameReady = await databaseApi.readyCheck(player.game_id);
+        if(gameReady){
+            await roundStart(player.game_id);
+            // player = await databaseApi.getPlayerObject(player.id);
+            await pushActiveArticle();
+            await pushPlayerList();
+            io.to(roomCode).emit("roundStarting")
+        }
+    });
+
+    socket.on("readyForNextRound", async () => {
         const winner = await winnerCheck(player.game_id);
         console.log("the winner is", winner);
         if(winner === undefined){
-            const gameReady = await databaseApi.readyCheck(player.game_id);
-            if(gameReady){
-                await roundStart(player.game_id);
-                // player = await databaseApi.getPlayerObject(player.id);
-                await pushActiveArticle();
-                await pushPlayerList();
-                io.to(roomCode).emit("roundStarting")
+            if(player.is_honest){
+            io.to(player.socket_id).emit("youAreNextInterrogator");
             }
         } else {
             io.to(roomCode).emit("gameOver", winner);
         }
-    });
+    })
 
-    socket.on("readyForNextRound", () => {
+    socket.on("newInterrogatorReady", () => {
         io.to(roomCode).emit("newRoundStarting");
     })
 
-    socket.on("disconnect", (reason: DisconnectReason) => {
+    socket.on("disconnect", async (reason: DisconnectReason) => {
         console.log("Socket has disconnected:", socket.id,reason);
         player.is_connected = false;
         console.log(JSON.stringify(player));
         if(player.game_id !== undefined) { 
             console.log("Player was assigned to a game. handling disconnect.");
-            handleDisconnect(player, socket, roomCode);
-            pushPlayerList();
+            await handleDisconnect(player, socket, roomCode);
+            await pushPlayerList();
         } else console.log("Player was not assigned to a game.");
     });
     
@@ -269,7 +258,21 @@ io.on("connection", (socket: Socket) => {
         io.to(socket.id).emit('deliveringActiveArticle', activeArticle);
     }
 
-
+    async function generateArticleOptions(): Promise<Array<Article>>{
+        const numberOfOptions: number = await databaseApi.getGameMaxArticles(player.game_id);
+        let articleOptions: Array<Article> = [];
+        for(let i=0; i<numberOfOptions; i++){
+            const randomResults: RandomResults = await fetchRandomArticle();
+            const article: Article = {
+                id: undefined,
+                player_id: player.id,
+                wiki_id: randomResults.id,
+                title: randomResults.title,
+            }
+            articleOptions.push(article);
+        }
+        return articleOptions;
+    }
 
     //io.on("shuffleArticles", () => {})
     //io.on("kickPlayer", () => {})
@@ -295,25 +298,6 @@ async function handleDisconnect(player: Player, socket: Socket, roomCode: string
     };
 }
 
-async function playerExit(player: Player, socket: Socket, roomCode: string){
-    await databaseApi.deletePlayerFromDatabase(player.id);
-    const gameEmpty: boolean = await databaseApi.isGameEmpty(player.game_id);
-    if(gameEmpty) {
-        console.log("empty game will be deleted."); 
-        await databaseApi.deleteGameFromDatabase(player.game_id);
-    }
-    // else {
-        io.to(roomCode).emit("playerLeft", player.screenname);
-        socket.leave(roomCode)
-        if(player.is_host){
-            // assignRandomHost();
-        }
-        if(player.is_interrogator || player.is_honest){
-            // endRoundEarly();
-        }
-    // };
-}
-
 async function roundStart(gameId: number) {
     await assignGameRoles(gameId);
     let game = await databaseApi.getGameObject(gameId);
@@ -330,33 +314,6 @@ async function winnerCheck(gameId: number): Promise<Player|undefined>{
     } else if(game.current_round === game.max_rounds) {
         return playerList.sort((a, b) => b.score - a.score)[0]; 
     } else { return undefined; }
-}
-
-
-async function oldAssignGameRoles(gameId: number){
-    let playerList: Array<Player> = await databaseApi.getAllPlayerObjects(gameId);
-    let candidates: Array<Player> = [];
-    let interrogator: Player = undefined;
-    for (const player of playerList) {
-        if (!player.is_honest){
-            candidates.push(player);
-        } else {
-            await databaseApi.setPlayerInterrogator(player.game_id, player.id, true);
-            await databaseApi.setPlayerHonest(player.game_id,player.id,false);
-            interrogator = player;
-        }
-    } if(interrogator === undefined){
-        let index: number = Math.floor(Math.random() * candidates.length);
-        interrogator = candidates[index];
-        candidates.splice(index,1);
-    }
-    const newHonestPlayer: Player = candidates[Math.floor(Math.random() * candidates.length)];
-    for (const player of candidates) {
-        await databaseApi.setPlayerInterrogator(player.game_id, player.id, false);
-        if(player === newHonestPlayer){ 
-            await databaseApi.setPlayerHonest(player.game_id,player.id,true);
-        }
-    }
 }
 
 async function assignGameRoles(gameId: number){
