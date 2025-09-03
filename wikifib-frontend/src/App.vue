@@ -10,6 +10,7 @@
   const tutorialWindow = () => {return state.tutorialWindow};
   const toggleTutorialWindow = () => {state.tutorialWindow = !state.tutorialWindow};
   const inRoom = () => {return (state.roomCode !== 'undefined')};
+  const buttonText = () => {return state.tutorialWindow ? 'X' : 'How to Play'};
 </script>
 
 <style>
@@ -45,10 +46,18 @@
     border-radius: 0.5rem;
   }
   .how-to-button {
-    width: 0.5rem;
-    height: 0.5rem;
-    padding: 5%;
-    border-radius:100%
+    /* width: 32px;
+    height: 32px; */
+    font-size: xx-small;
+    padding: 12px;
+    border-radius: 50%;
+    position: absolute;
+    left: 8px;
+    top: 8px;
+    z-index: 3;
+    background-color: #404040;
+    color: white;
+    
   }
   .right-aligned{
     text-align: right;
@@ -57,7 +66,7 @@
 </style>
 
 <template>
-  <button class="how-to-button" @click="toggleTutorialWindow()">?</button>
+  <button class="how-to-button" @click="toggleTutorialWindow()">{{buttonText()}}</button>
   <div class="right-aligned">
   <PlayerInfo v-if="inRoom()"/>
   </div>
