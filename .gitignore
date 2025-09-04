@@ -3,3 +3,4 @@ wikifibdump081925.sql
 wikifib.sql
 wikifib_core.sql
 wikifib-frontend/secrets.js
+server/server.log

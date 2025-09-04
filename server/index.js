@@ -37,6 +37,22 @@ const databaseApi = __importStar(require("./databaseApi"));
 const constants = __importStar(require("./const"));
 const http_1 = require("http");
 const socket_io_1 = require("socket.io");
+const fs = require('fs');
+const path = require('path');
+const logFilePath = path.join(__dirname, 'server.log');
+const originalLog = console.log;
+console.log = function (message) {
+    const timestamp = new Date().toISOString();
+    let entry = timestamp + ' ' + message;
+    fs.appendFile(logFilePath, entry + '\n', (err) => {
+        if (err) {
+            console.error('Error appending to log file:', err);
+        }
+        else {
+            originalLog(entry);
+        }
+    });
+};
 const httpServer = (0, http_1.createServer)();
 const io = new socket_io_1.Server(httpServer, {
     pingTimeout: 30000,
@@ -59,12 +75,13 @@ const defaultParams = constants.defaultParams;
 // io.on("playerKicked", () => {})
 // io.on("playerGuessed", () => {})
 async function sanityCheck() {
-    console.log("Sanity Check");
+    console.log("Server starting up");
 }
 sanityCheck();
 io.on("connection", (socket) => {
     //sanityCheck();
-    console.log('Socket has connected:', socket.id);
+    let msg = 'Socket has connected: ' + socket.id;
+    console.log(msg);
     let player = {
         id: undefined,
         game_id: undefined,
@@ -92,10 +109,10 @@ io.on("connection", (socket) => {
     let roomCode;
     socket.on("createGame", async (initOptions) => {
         const socketIdUnique = await databaseApi.isSocketIdUnique(socket.id);
-        console.log(socketIdUnique);
         if (socketIdUnique) {
-            console.log("Game create emit received");
-            console.log(JSON.stringify(initOptions));
+            player.screenname = initOptions.hostScreenname;
+            let msg = 'Game create emit received from ' + player.screenname;
+            console.log(msg);
             player.screenname = initOptions.hostScreenname;
             const newGameOutput = await createNewGame(initOptions, player);
             player = newGameOutput[0];
@@ -103,7 +120,6 @@ io.on("connection", (socket) => {
             await io.to(socket.id).emit("playerUpdated", player);
             await io.to(socket.id).emit("gameCreated", roomCode, player);
             socket.join(roomCode);
-            console.log(socket.rooms);
         }
         else {
             io.to(player.socket_id).emit("errorSocketIdNotUnique");
@@ -225,7 +241,6 @@ io.on("connection", (socket) => {
         ;
         playersArticle = selectedArticle;
         playersArticle.id = await databaseApi.addArticleToDatabase(playersArticle);
-        console.log(player.screenname, "selected article", playersArticle);
         io.to(socket.id).emit("articleRegistered", playersArticle);
     });
     socket.on("playerReady", async () => {
@@ -242,7 +257,6 @@ io.on("connection", (socket) => {
     });
     socket.on("readyForNextRound", async () => {
         const winner = await winnerCheck(player.game_id);
-        console.log("the winner is", winner);
         if (winner === undefined) {
             if (player.is_honest) {
                 io.to(player.socket_id).emit("youAreNextInterrogator");
@@ -256,16 +270,16 @@ io.on("connection", (socket) => {
         io.to(roomCode).emit("newRoundStarting");
     });
     socket.on("disconnect", async (reason) => {
-        console.log("Socket has disconnected:", socket.id, reason);
+        let msg = "Socket has disconnected: " + socket.id + ' ' + reason;
+        console.log(msg);
         player.is_connected = false;
-        console.log(JSON.stringify(player));
         if (player.game_id !== undefined) {
-            console.log("Player was assigned to a game. handling disconnect.");
+            console.log(`Player ${player.screenname} was assigned to a game. handling disconnect.`);
             await handleDisconnect(player, socket, roomCode);
             await pushPlayerList();
         }
         else
-            console.log("Player was not assigned to a game.");
+            console.log(`Player ${player.screenname} was not assigned to a game.`);
     });
     async function pushPlayerList() {
         const playerList = await databaseApi.getAllConnectedPlayers(player.game_id);
@@ -305,11 +319,11 @@ async function handleDisconnect(player, socket, roomCode) {
     await databaseApi.updatePlayer(player);
     const gameEmpty = await databaseApi.isGameEmpty(player.game_id);
     if (gameEmpty) {
-        console.log("empty game will be deleted.");
+        console.log(`Empty game ${roomCode} will be deleted.`);
         await databaseApi.deleteGameFromDatabase(player.game_id);
     }
     else {
-        console.log("player left a non-empty game");
+        console.log(`Player ${player.screenname} left a non-empty game`);
         io.to(roomCode).emit("playerLeft");
         socket.leave(roomCode);
         if (player.is_host) {

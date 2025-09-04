@@ -45,6 +45,7 @@
     margin: 16px;
     width: 60%;
     height: 5%;
+    box-shadow:  #FFFFFF;
   }
   .reminder {
     font-style: italic;
@@ -66,7 +67,7 @@
     border-bottom-right-radius: 32px;
   }
   .activemode {
-    background-color: lime;
+    background-color: #44CCFF;
     text-align: center;
     -webkit-animation: glow 1s ease-in-out infinite alternate;
     -moz-animation: glow 1s ease-in-out infinite alternate;
@@ -88,12 +89,21 @@
     -o-transition: all 0.25s linear;
     transition: all 0.25s linear;
   }
+  .roomcode {
+    height: 64px;
+    font-size: 48px;
+    width: 256px;
+    text-transform: uppercase;
+    font-weight: bold;
+    outline-style: none;
+    font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif
+  }
   @keyframes glow {
     from {
-        box-shadow: 0 0 05px lime, 0 0 10px lime
+        box-shadow: 0 0 05px #44CCFF, 0 0 10px #44CCFF
     }
     to {
-        box-shadow:  0 0 10px lime, 0 0 15px lime
+        box-shadow:  0 0 10px #44CCFF, 0 0 15px #44CCFF
     }
   }
 </style>
@@ -101,7 +111,7 @@
 <template>
   <div class="center-aligned">
     <label for="screenname">Name</label><br>
-    <input type="text" minlength="1" maxlength="30" id="screenname" name="screenname" v-model="name"/><br>
+    <input class="textinput" type="text" minlength="1" maxlength="30" id="screenname" name="screenname" v-model="name"/><br>
     <p class="reminder">Note: This game works best when players use their real names!</p>
     <br>
       <button :class="{activemode: (currentMode===Modes.JoinGame), inactivemode: (currentMode!==Modes.JoinGame)}" class="mode-select msleft" @click="currentMode=Modes.JoinGame">JOIN</button>
@@ -109,7 +119,7 @@
       <h2 class="subheader">JOIN A GAME</h2><br>
       <form @submit.prevent="joinGame">
         <label for="roomCode">Room Code </label><br>
-        <input type="text" minlength="5" maxlength="5" id="roomCode" name="roomCode" v-model="roomCode"/><br>
+        <input class="textinput roomcode" type="text" minlength="5" maxlength="5" id="roomCode" name="roomCode" v-model="roomCode"/><br>
         <button class="submit" type="submit">Join Game</button>
       </form>
     </div>

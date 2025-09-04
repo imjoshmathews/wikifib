@@ -1,5 +1,6 @@
 <script setup>
   import { socket, state, PageModes } from './socket';
+  import TopHeader from './components/TopHeader.vue';
   import RoomCodeLobby from '@/components/RoomCodeLobby.vue';
   import LandingPage from '@/components/LandingPage.vue';
   import ArticlePortal from '@/components/ArticlePortal.vue';
@@ -8,21 +9,12 @@
   import PlayerInfo from './components/PlayerInfo.vue';
   const frontendMode = () => {return state.frontendMode};
   const tutorialWindow = () => {return state.tutorialWindow};
-  const toggleTutorialWindow = () => {state.tutorialWindow = !state.tutorialWindow};
   const inRoom = () => {return (state.roomCode !== 'undefined')};
-  const buttonText = () => {return state.tutorialWindow ? 'X' : 'How to Play'};
+  const buttonText = () => {return state.tutorialWindow ? 'x' : 'rules'};
 </script>
 
 <style>
-  .main-header {
-    /* color: white; */
-    text-align: center;
-  }
-  .subtitle {
-    text-align: center;
-    font-size: 1.5rem;
-    padding: 0;
-  }
+
   .center-aligned {
     text-align: center;
   }
@@ -45,20 +37,7 @@
     text-align: center;
     border-radius: 0.5rem;
   }
-  .how-to-button {
-    /* width: 32px;
-    height: 32px; */
-    font-size: xx-small;
-    padding: 12px;
-    border-radius: 50%;
-    position: absolute;
-    left: 8px;
-    top: 8px;
-    z-index: 3;
-    background-color: #404040;
-    color: white;
-    
-  }
+ 
   .right-aligned{
     text-align: right;
     text-transform: uppercase;
@@ -66,16 +45,11 @@
 </style>
 
 <template>
-  <button class="how-to-button" @click="toggleTutorialWindow()">{{buttonText()}}</button>
-  <div class="right-aligned">
-  <PlayerInfo v-if="inRoom()"/>
-  </div>
+  <TopHeader/>
   <HowToPlay v-if="tutorialWindow()"/>
-  <h1 class="main-header">wikifib</h1>
-  <h2 class="subtitle">A party game about learning and lying.</h2>
-  <br>
   <LandingPage v-if="frontendMode()===PageModes.OnLandingPage"/>
   <RoomCodeLobby v-if="frontendMode()===PageModes.InLobby"/>
   <ArticlePortal v-if="frontendMode()===PageModes.ChoosingArticle"/>
   <GameplayPage v-if="frontendMode()===PageModes.PlayingGame"/>
+  <footer>Joshua Mathews ©2025 - All Rights Reserved</footer>
 </template>

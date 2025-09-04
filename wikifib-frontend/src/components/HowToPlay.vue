@@ -11,7 +11,7 @@
         outline-width:2px; */
         outline-color:rgb(225, 0, 255);
         color: rgb(235,235,235,0.66);
-        background-color: rgb(17, 1, 4);
+        background-color: #222222;
         padding: 0.5rem;
         z-index: 2;
         position: absolute;
