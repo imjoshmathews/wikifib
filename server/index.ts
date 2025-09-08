@@ -34,20 +34,6 @@ const wikiApiRoot: string = constants.wikiApiRoot;
 const roomCodeLength: number = constants.roomIdLength;
 const defaultParams: QueryParams = constants.defaultParams;
 
-// outbound events
-
-// io.on("updateArticleOptions", () => {})
-// io.on("updateActiveArticle", () => {})
-// io.on("updateScore", () => {})
-// io.on("updateRound", () => {})
-// io.on("updateHost", () => {})
-// io.on("updateInterrogator", () => {})
-// io.on("updateHonestPlayer", () => {})
-
-// io.on("playerKicked", () => {})
-// io.on("playerGuessed", () => {})
-
-
 async function sanityCheck(){
     console.log("Server starting up");
 }
@@ -77,14 +63,6 @@ io.on("connection", (socket: Socket) => {
         wiki_id: undefined,
         title: undefined,
     }
-
-    // let activeArticle: Article = {
-    //     id: undefined,
-    //     player_id: undefined,
-    //     wiki_id: undefined,
-    //     title: undefined,
-    // }
-
 
     let roomCode: string;
 

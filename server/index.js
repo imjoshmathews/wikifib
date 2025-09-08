@@ -64,16 +64,6 @@ const io = new socket_io_1.Server(httpServer, {
 const wikiApiRoot = constants.wikiApiRoot;
 const roomCodeLength = constants.roomIdLength;
 const defaultParams = constants.defaultParams;
-// outbound events
-// io.on("updateArticleOptions", () => {})
-// io.on("updateActiveArticle", () => {})
-// io.on("updateScore", () => {})
-// io.on("updateRound", () => {})
-// io.on("updateHost", () => {})
-// io.on("updateInterrogator", () => {})
-// io.on("updateHonestPlayer", () => {})
-// io.on("playerKicked", () => {})
-// io.on("playerGuessed", () => {})
 async function sanityCheck() {
     console.log("Server starting up");
 }
@@ -100,12 +90,6 @@ io.on("connection", (socket) => {
         wiki_id: undefined,
         title: undefined,
     };
-    // let activeArticle: Article = {
-    //     id: undefined,
-    //     player_id: undefined,
-    //     wiki_id: undefined,
-    //     title: undefined,
-    // }
     let roomCode;
     socket.on("createGame", async (initOptions) => {
         const socketIdUnique = await databaseApi.isSocketIdUnique(socket.id);
