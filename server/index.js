@@ -151,6 +151,7 @@ io.on("connection", (socket) => {
             socket.join(roomCode);
             player = loadedPlayer;
             player.socket_id = socket.id;
+            player.is_connected = true;
             await databaseApi.updatePlayer(player);
             await pushPlayerList();
             await pushActiveArticle();
@@ -276,9 +277,11 @@ io.on("connection", (socket) => {
     }
     async function pushActiveArticle() {
         const honestPlayer = await databaseApi.getHonestPlayer(player.game_id);
-        const activeArticleId = await databaseApi.getArticleIdFromPlayerId(honestPlayer.id);
-        const activeArticle = await databaseApi.getArticleObject(activeArticleId);
-        io.to(socket.id).emit('deliveringActiveArticle', activeArticle);
+        if (honestPlayer !== undefined) {
+            const activeArticleId = await databaseApi.getArticleIdFromPlayerId(honestPlayer.id);
+            const activeArticle = await databaseApi.getArticleObject(activeArticleId);
+            io.to(socket.id).emit('deliveringActiveArticle', activeArticle);
+        }
     }
     async function generateArticleOptions() {
         const numberOfOptions = await databaseApi.getGameMaxArticles(player.game_id);

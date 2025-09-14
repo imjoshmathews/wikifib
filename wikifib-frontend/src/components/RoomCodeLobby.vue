@@ -38,7 +38,7 @@
         <h1 class="rc">{{ roomCode() }}</h1>
         <p>Invite your friends to join you by heading over to wikifib.com and entering this code!</p>
         <br>
-        <h2 v-if="playerList().length<1">Waiting for at least 3 players...</h2>
+        <h2 v-if="playerList().length<3">Waiting for at least 3 players...</h2>
         <div v-else>
         <span v-if="playerSelf().is_host">
             <h2>You are the host!</h2>

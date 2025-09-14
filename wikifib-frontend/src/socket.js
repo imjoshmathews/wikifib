@@ -13,6 +13,7 @@ export const state = reactive({
   connected: false,
   tutorialWindow: false,
   roundEndWindow: false,
+  guessedToggle: false,
 
   roomCode: 'undefined',
   frontendMode: PageModes.OnLandingPage,
@@ -182,6 +183,7 @@ socket.on("youAreNextInterrogator", async () => {
 });
 
 socket.on("newRoundStarting", async () => {
+  state.guessedToggle = false;
   state.frontendMode = PageModes.ChoosingArticle;
   autosaveSession();
 })

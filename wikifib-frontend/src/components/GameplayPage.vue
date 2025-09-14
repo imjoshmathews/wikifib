@@ -1,6 +1,5 @@
 <script setup>
     import {state, socket} from '@/socket';
-
     const playerSelf = () => {return state.playerSelf};
     const activeArticle = () => {return state.activeArticle};
     const roundEndWindow = () => {return state.roundEndWindow};
@@ -8,8 +7,10 @@
     const guessPlayer = (player) => {
         if(window.confirm(`Are you sure you want to guess ${player.screenname}?`)){
             socket.emit("guessPlayer", player);
+            state.guessedToggle = true;
         }
     }
+    const guessedToggle = () => {return state.guessedToggle};
     const roundEnd = () => {
         state.roundEndWindow = false;
     }
@@ -39,8 +40,10 @@
     <span v-else-if="playerSelf().is_interrogator">
         You are the interrogator.<br>
         Ask the other players questions until you're ready to guess!<br><br>
-        <h3>GUESS THE HONEST PLAYER:</h3><br>
-        <button class="guess-button" @click="guessPlayer(player)" v-for="player in interrogatorPlayerList()" :key="player">{{player.screenname}}</button>
+        <span v-if="guessedToggle()===false">
+            <h3>GUESS THE HONEST PLAYER:</h3><br>
+            <button class="guess-button" @click="guessPlayer(player)" v-for="player in interrogatorPlayerList()" :key="player">{{player.screenname}}</button>
+        </span>
     </span>
     <span v-else>
         You are a liar.<br>
